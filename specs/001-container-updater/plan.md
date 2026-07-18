@@ -94,6 +94,11 @@ frontend/
 │   └── services/        # Frontend API client
 ├── package.json
 └── tsconfig.json
+
+Dockerfile.backend       # Multi-stage build for Go backend daemon
+Dockerfile.frontend      # Multi-stage build for Next.js frontend
+docker-compose.yml       # Docker Compose definition for containerized run
+
 ```
 
 **Structure Decision**: Multi-component workspace. The backend directory will contain the Go application, and the frontend directory will contain the Next.js TypeScript application.

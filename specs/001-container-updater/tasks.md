@@ -107,8 +107,10 @@
 **Purpose**: Improvements that affect multiple user stories
 
 - [ ] T028 [P] Add Apprise notification settings configuration page in `frontend/src/pages/settings.tsx`
-- [ ] T029 Update `README.md` with build and deploy instructions
-- [ ] T030 Run end-to-end validation scenarios documented in `specs/001-container-updater/quickstart.md`
+- [ ] T029 [P] Create multi-stage container deployment configurations in `Dockerfile.backend`, `Dockerfile.frontend`, and `docker-compose.yml`
+- [ ] T030 Update `README.md` with container build and deployment instructions
+- [ ] T031 Run end-to-end validation scenarios documented in `specs/001-container-updater/quickstart.md`
+
 
 ---
 

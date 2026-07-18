@@ -85,6 +85,8 @@ As a system administrator, I want to click an "Update" button on the Web UI for 
 - **FR-006**: The system MUST support updating workloads running in Docker Compose stacks and Kubernetes/k3s clusters.
 - **FR-007**: Access to the Web UI MUST be secured via multi-user OAuth2/OIDC authentication, supporting configurable providers such as Authelia and Authentik.
 - **FR-008**: The configuration of registries, schedules, and notifications MUST be definable via a configuration file (YAML/JSON) and manageable via a settings page in the Web UI (persisted in a database).
+- **FR-009**: The container-updater application itself MUST be deployable as a Docker container, supporting multi-architecture builds (linux/amd64 and linux/arm64).
+
 
 ### Key Entities *(include if feature involves data)*
 
