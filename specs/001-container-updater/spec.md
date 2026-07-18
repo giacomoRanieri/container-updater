@@ -60,11 +60,26 @@ As a system administrator, I want to click an "Update" button on the Web UI for 
 
 **Acceptance Scenarios**:
 
-1. **Given** a Docker Compose service has an update available, **When** the administrator clicks the "Update" button, **Then** the backend pulls the new image and restarts/recreates the compose service using Compose commands, preserving original volumes, ports, environment variables, and network configurations.
-2. **Given** a Kubernetes Deployment has an update available, **When** the administrator clicks the "Update" button, **Then** the backend updates the deployment image tag/digest to trigger a rolling update in the cluster.
+1. **Given** a Docker Compose service has an update available, **When** the administrator clicks the "Update" button, **Then** the backend updates the image tag in the corresponding `docker-compose.yml` file on disk, runs `docker compose up -d` for that file, and verifies the service restarted successfully with the new image.
+2. **Given** a Kubernetes Deployment has an update available, **When** the administrator clicks the "Update" button, **Then** the backend updates the image tag/digest in the local Kubernetes manifest YAML on disk, applies it, and verifies the deployment rolling update is initiated.
 3. **Given** a container update is in progress, **When** another update request is sent for the same container, **Then** the system rejects it and indicates that an update is already in progress.
 
 ---
+
+### User Story 4 - GitOps Git Integration (Priority: P3)
+
+As a system administrator, I want the system to commit and push updated YAML files to a Git repository when an update occurs, so that my Git-based configuration stays in sync with my running workloads.
+
+**Why this priority**: Crucial for users employing GitOps workflows to maintain Git as the single source of truth.
+
+**Independent Test**: Can be tested by triggering an update, verifying that manifest changes are written to disk, and confirming a new commit is pushed to the target Git repository containing the image update diff.
+
+**Acceptance Scenarios**:
+
+1. **Given** Git integration is enabled, **When** a Compose or Kubernetes YAML manifest is updated, **Then** the backend commits the changed file with a message (e.g., "chore: update dummy-nginx to image:tag") and pushes it to the configured remote repository.
+
+---
+
 
 ### Edge Cases
 
@@ -82,10 +97,12 @@ As a system administrator, I want to click an "Update" button on the Web UI for 
 - **FR-003**: The system MUST support Apprise integration to send notifications to Telegram and Home Assistant.
 - **FR-004**: The system MUST expose a REST API to query container status and trigger updates.
 - **FR-005**: The system MUST expose a Web UI that displays the monitored containers and allows triggering updates.
-- **FR-006**: The system MUST support updating workloads running in Docker Compose stacks and Kubernetes/k3s clusters.
+- **FR-006**: The system MUST support updating workloads by modifying configuration files (Docker Compose YAML files and Kubernetes manifests) on disk.
 - **FR-007**: Access to the Web UI MUST be secured via multi-user OAuth2/OIDC authentication, supporting configurable providers such as Authelia and Authentik.
 - **FR-008**: The configuration of registries, schedules, and notifications MUST be definable via a configuration file (YAML/JSON) and manageable via a settings page in the Web UI (persisted in a database).
 - **FR-009**: The container-updater application itself MUST be deployable as a Docker container, supporting multi-architecture builds (linux/amd64 and linux/arm64).
+- **FR-010**: The system MUST support GitOps integration to commit and push changed configuration files to a configured Git repository.
+
 
 
 ### Key Entities *(include if feature involves data)*

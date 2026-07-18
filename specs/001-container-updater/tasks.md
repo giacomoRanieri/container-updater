@@ -94,8 +94,8 @@
 ### Implementation for User Story 3
 
 - [ ] T023 [US3] Create UpdateJob entity model and SQLite queries in `backend/internal/db/job.go`
-- [ ] T024 [US3] Implement Compose service recreation logic (stop, pull, restart) in `backend/internal/docker/update.go`
-- [ ] T025 [US3] Implement Kubernetes deployment image patching logic in `backend/internal/k8s/update.go`
+- [ ] T024 [US3] Implement Compose YAML modification and shell execution of `docker compose up -d` in `backend/internal/docker/update.go`
+- [ ] T025 [US3] Implement Kubernetes YAML manifest modification and client-go application in `backend/internal/k8s/update.go`
 - [ ] T026 [US3] Implement REST endpoint to trigger manual workload update job in `backend/internal/api/jobs.go`
 - [ ] T027 [P] [US3] Add manual update trigger buttons to the dashboard component in `frontend/src/components/WorkloadItem.tsx`
 
@@ -103,14 +103,28 @@
 
 ---
 
-## Phase 6: Polish & Cross-Cutting Concerns
+## Phase 6: User Story 4 - GitOps Git Integration (Priority: P3)
+
+**Goal**: Commit and push manifest updates to a Git repository.
+
+**Independent Test**: Verify file is updated, committed, and pushed to remote Git repository.
+
+### Implementation for User Story 4
+
+- [ ] T028 [US4] Implement GitOps Git repository clone, commit, and push wrapper in `backend/internal/git/gitops.go`
+- [ ] T029 [P] [US4] Add Git authentication settings (SSH keys or token) in `backend/internal/config/config.go`
+
+---
+
+## Phase 7: Polish & Cross-Cutting Concerns
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T028 [P] Add Apprise notification settings configuration page in `frontend/src/pages/settings.tsx`
-- [ ] T029 [P] Create multi-stage container deployment configurations in `Dockerfile.backend`, `Dockerfile.frontend`, and `docker-compose.yml`
-- [ ] T030 Update `README.md` with container build and deployment instructions
-- [ ] T031 Run end-to-end validation scenarios documented in `specs/001-container-updater/quickstart.md`
+- [ ] T030 [P] Add Apprise notification and Git settings page in `frontend/src/pages/settings.tsx`
+- [ ] T031 [P] Create multi-stage container deployment configurations in `Dockerfile.backend`, `Dockerfile.frontend`, and `docker-compose.yml`
+- [ ] T032 Update `README.md` with container build, volume mount, and deployment instructions
+- [ ] T033 Run end-to-end validation scenarios documented in `specs/001-container-updater/quickstart.md`
+
 
 
 ---

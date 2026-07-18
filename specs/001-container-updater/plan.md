@@ -41,6 +41,10 @@ The `container-updater` application will consist of a **Go backend** acting as a
 **Constraints**:
 - Access to the host's Docker socket and/or local Kubernetes API (in-cluster configuration).
 - Pure-Go SQLite configuration to simplify cross-compilation inside Docker images.
+- Access to a mounted folder containing the Docker Compose files and/or Kubernetes YAML manifests.
+- Execution of Docker commands (Docker-outside-of-Docker) to run `docker compose up -d` against the mounted files.
+- Git client or library access (using pure-Go `github.com/go-git/go-git/v5` or local `git` CLI) to commit and push updated manifests.
+
 
 **Scale/Scope**: Up to 100 monitored workloads per instance, single cluster or host Docker engine.
 
