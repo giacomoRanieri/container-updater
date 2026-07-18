@@ -10,7 +10,8 @@ The `container-updater` application will consist of a **Go backend** acting as a
 
 ## Technical Context
 
-**Language/Version**: Go 1.22+ (Backend), TypeScript / Node.js 20+ (Frontend)
+**Language/Version**: Go 1.22+ (Backend), TypeScript / Node.js 20+ / pnpm 9+ (Frontend)
+
 
 **Primary Dependencies**:
 - Backend:

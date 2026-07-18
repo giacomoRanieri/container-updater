@@ -24,7 +24,8 @@
 
 - [ ] T001 Create project directories for `backend/` and `frontend/`
 - [ ] T002 Initialize Go modules in `backend/go.mod`
-- [ ] T003 [P] Initialize Next.js project in `frontend/package.json`
+- [ ] T003 [P] Initialize Next.js project using pnpm in `frontend/package.json`
+
 
 ---
 

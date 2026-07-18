@@ -31,9 +31,10 @@ To run the full stack for validation:
 2. **Build and Run Frontend**:
    ```bash
    cd frontend
-   npm install
-   npm run dev
+   pnpm install
+   pnpm dev
    ```
+
 
 ---
 
