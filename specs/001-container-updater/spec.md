@@ -29,7 +29,7 @@ As a system administrator, I want the system to periodically check if new versio
 **Acceptance Scenarios**:
 
 1. **Given** a container running image `nginx:1.25.0` and a registry containing `nginx:1.25.1` (or a newer digest for the same tag), **When** the scheduled check executes, **Then** the system detects a newer version is available.
-2. **Given** a container with an update detected, **When** the check completes, **Then** a notification is dispatched via Apprise containing the container name, current image version/digest, and new image version/digest.
+2. **Given** a container with an update detected, **When** the check completes, **Then** a notification is dispatched via Apprise containing the container name, current image version/digest, new image version/digest, and a snippet of the latest GitHub releases changelog (if the image has a linked GitHub source).
 3. **Given** a container running the latest version available on the registry, **When** the scheduled check executes, **Then** no update is detected and no notification is sent.
 
 ---
@@ -47,6 +47,7 @@ As a system administrator, I want to open a Web UI dashboard securely using my O
 1. **Given** the backend has scanned the containers, **When** the authenticated administrator loads the Web UI, **Then** a clean dashboard is displayed listing all monitored containers with their names, namespace/project, status (running/stopped), current image tags, and update status ("Up to date" or "Update available").
 2. **Given** a container has an update available, **When** viewed on the dashboard, **Then** an "Update" button is enabled next to that container.
 3. **Given** the system is configured with an OAuth2 provider, **When** an unauthenticated user visits the Web UI, **Then** they are redirected to the identity provider login screen.
+4. **Given** update jobs have been executed in the past, **When** the administrator views the Audit Log section, **Then** a table is displayed showing a list of past jobs with container names, status (success/failed), execution times, and any associated error details.
 
 ---
 
@@ -102,6 +103,11 @@ As a system administrator, I want the system to commit and push updated YAML fil
 - **FR-008**: The configuration of registries, schedules, and notifications MUST be definable via a configuration file (YAML/JSON) and manageable via a settings page in the Web UI (persisted in a database).
 - **FR-009**: The container-updater application itself MUST be deployable as a Docker container, supporting multi-architecture builds (linux/amd64 and linux/arm64).
 - **FR-010**: The system MUST support GitOps integration to commit and push changed configuration files to a configured Git repository.
+- **FR-011**: The system MUST only scan workloads that have the label `container-updater.enable=true` (Docker) or annotation `container-updater.enable: "true"` (Kubernetes) enabled.
+- **FR-012**: The system MUST support storing and using registry authentication credentials to check private registries.
+- **FR-013**: The system MUST log all update actions and maintain an audit log / job history visible in the Web UI.
+- **FR-014**: The system MUST extract the GitHub repository source from image labels (e.g. `org.opencontainers.image.source`) and fetch the release notes / changelog from the GitHub API to enrich notification messages.
+
 
 
 
