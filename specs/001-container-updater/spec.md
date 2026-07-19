@@ -89,13 +89,28 @@ As a project maintainer and contributor, I want the repository to enforce Conven
 
 **Independent Test**: Can be tested by submitting a PR with Conventional Commit formatting, verifying CI status checks and maintainer approval enforcement, merging to `develop` to verify automated Beta image publishing, and merging a Release-Please PR to `master` to confirm GitHub Release creation and tagged GHCR Docker image deployment.
 
-**Acceptance Scenarios**:
+### User Story 5 - Repository Version Management & CI/CD Automation (Priority: P2)
 
-1. **Given** a contributor opens a Pull Request towards `develop` or `master`, **When** the PR title or commit messages fail Conventional Commits validation, **Then** the CI `commitlint` status check fails and blocks merging.
-2. **Given** a Pull Request is opened against `master` or `develop`, **When** an unapproved or direct commit is attempted, **Then** branch protection rules reject direct pushes and require at least 1 approval from a Maintainer listed in `.github/CODEOWNERS` alongside passing CI status checks.
-3. **Given** PRs are merged into `develop` using Squash & Merge, **When** the CI workflow triggers, **Then** a multi-architecture Beta Docker image is built and pushed to GHCR (tagged `:beta` and `:vX.Y.Z-beta.N`), and a GitHub Pre-release is created/updated.
-4. **Given** commits accumulate on `master` or `develop`, **When** Release-Please runs, **Then** it automatically calculates the next Semantic Version (Patch for `fix:`, Minor for `feat:`, Major for `feat!:` or `BREAKING CHANGE:`), maintains `CHANGELOG.md`, and creates a Release PR.
-5. **Given** a Release PR is approved and merged into `master`, **When** the Release CI pipeline runs, **Then** an official GitHub Release is published with release notes, binary archives, and multi-architecture Docker images are published to GHCR tagged with `:latest`, `:vX.Y.Z`, `:vX.Y`, and `:vX`.
+As a maintainer or external contributor, I want automated conventional commit checks, automated SemVer versioning and CHANGELOG generation via Release-Please, multi-architecture Docker image builds for Beta (`develop`) and GA (`master`), CODEOWNERS branch protection, PR preview container lifecycles, and environment approval gates, so that the project maintains strict software quality standards, automated release channels, and secure governance.
+
+#### Acceptance Criteria
+- **AC-5.1**: Automated CI (`commitlint`) validates Conventional Commits for all commit headers and PR titles.
+- **AC-5.2**: Merges to `develop` trigger Release-Please to update `CHANGELOG.md` and manage SemVer pre-releases (`vX.Y.Z-beta.N`), and publish multi-arch Docker images (`:beta`, `:beta-<sha>`) to GHCR.
+- **AC-5.3**: Merges of Release PRs to `master` automatically generate official GitHub Releases, publish source archives, and tag production Docker images (`:latest`, `:vX.Y.Z`, `:vX.Y`, `:vX`) on GHCR.
+- **AC-5.4**: Branch protection rules on `master` and `develop` block direct pushes, require passing status checks, and mandate at least 1 maintainer approval (`.github/CODEOWNERS`).
+- **AC-5.5**: Pull Requests generate temporary preview Docker images (`:pr-<N>`) on GHCR that are automatically deleted upon PR closure or merge via `pr-cleanup.yml`.
+- **AC-5.6**: Workflow deployment jobs incorporate GitHub Environment Approval Gates (`environment: beta-build`), requiring maintainer review before image publishing.
+
+### User Story 6 - Docker Compose GitOps & File-Based Kubernetes Updates (Priority: P2)
+
+As a DevOps engineer or system administrator, I want `container-updater` to support GitOps repository synchronization for Docker Compose stacks AND local file-based manifest updates for Kubernetes workloads, so that Compose configurations can be declaratively version-controlled in Git, and Kubernetes manifests on local disk can be updated directly without requiring cluster API write permissions.
+
+#### Acceptance Criteria
+- **AC-6.1**: When `COMPOSE_GITOPS_ENABLED=true`, `container-updater` clones a configured Git repository containing `docker-compose.yml` files, updates `image:` tags upon new release detection, and commits & pushes changes back to the remote Git repository.
+- **AC-6.2**: When `K8S_FILE_BASED_ENABLED=true`, `container-updater` scans a configured local directory (`K8S_MANIFEST_DIR`) for Kubernetes Deployment, StatefulSet, and DaemonSet YAML files.
+- **AC-6.3**: File-based Kubernetes updates parse local YAML manifests on disk, update the target `spec.template.spec.containers[].image` tag, and preserve original YAML formatting and indentation.
+- **AC-6.4**: File-based Kubernetes updates optionally support executing `kubectl apply -f <manifest>` or triggering local GitOps sync.
+- **AC-6.5**: The Web UI and API expose configuration fields for Compose GitOps repository settings (`COMPOSE_GITOPS_REPO_URL`, `COMPOSE_GITOPS_BRANCH`) and Kubernetes File-Based manifest paths (`K8S_MANIFEST_DIR`, `K8S_MANIFEST_PATH_MAP`).
 
 ---
 
@@ -133,10 +148,11 @@ As a project maintainer and contributor, I want the repository to enforce Conven
 - **FR-021**: Pull Requests MUST produce temporary PR Preview Docker images (`:pr-<N>`) on GHCR that exist only for the lifespan of the PR, and MUST be automatically deleted upon PR closure or merge via an automated cleanup workflow (`pr-cleanup.yml`).
 - **FR-022**: CI/CD pipelines MUST integrate GitHub Environment Approval Gates (`environment: beta-build`), requiring designated maintainer sign-off before publishing Docker images.
 - **FR-023**: CI/CD workflows MUST implement concurrency cancellation rules (`concurrency: cancel-in-progress: true`) to automatically abort redundant older builds when new commits are pushed.
-
-
-
-
+- **FR-024**: The system MUST support GitOps repository synchronization for Docker Compose stacks (`COMPOSE_GITOPS_ENABLED=true`), automatically committing and pushing updated `docker-compose.yml` `image:` tags to a remote Git repository.
+- **FR-025**: The system MUST support local file-based manifest updates for Kubernetes workloads (`K8S_FILE_BASED_ENABLED=true`), scanning a configured local directory (`K8S_MANIFEST_DIR`) for Kubernetes Deployment, StatefulSet, and DaemonSet YAML files.
+- **FR-026**: When file-based Kubernetes updating is active, the system MUST parse local Kubernetes YAML manifests on disk, update the target `spec.template.spec.containers[].image` tag value, and preserve original YAML formatting and indentation.
+- **FR-027**: The system MUST support mapping local Kubernetes manifest directories to host mounts (`K8S_MANIFEST_PATH_MAP`), allowing containerized `container-updater` deployments to locate and modify host Kubernetes YAML files.
+- **FR-028**: The Web UI settings page and REST API MUST expose configuration controls for Docker Compose GitOps (`COMPOSE_GITOPS_REPO_URL`, `COMPOSE_GITOPS_BRANCH`) and Kubernetes File-Based manifest options (`K8S_MANIFEST_DIR`, `K8S_FILE_BASED_ENABLED`, `K8S_MANIFEST_PATH_MAP`).
 
 ### Key Entities *(include if feature involves data)*
 
