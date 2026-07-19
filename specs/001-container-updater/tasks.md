@@ -144,6 +144,18 @@
 
 ---
 
+## Phase 9: User Story 6 - Docker Compose GitOps & File-Based Kubernetes Updates (Priority: P2)
+
+**Goal**: Support GitOps workflow for Docker Compose stacks and file-based local disk manifest updates for Kubernetes.
+
+- [ ] T045 [US6] Implement GitOps synchronization module for Docker Compose stacks (`COMPOSE_GITOPS_ENABLED`) in `backend/internal/git/compose_gitops.go`
+- [ ] T046 [US6] Implement local file-based Kubernetes manifest parser and updater (`K8S_FILE_BASED_ENABLED`, `K8S_MANIFEST_DIR`) in `backend/internal/k8s/file_updater.go`
+- [ ] T047 [US6] Implement path mapping utility for host-to-container Kubernetes manifest directories (`K8S_MANIFEST_PATH_MAP`) in `backend/internal/k8s/path_map.go`
+- [ ] T048 [US6] Expose Compose GitOps and Kubernetes File-Based configuration settings in REST API and Web UI settings page in `frontend/src/app/settings/page.tsx`
+- [ ] T049 [US6] Document Docker Compose GitOps and Kubernetes File-Based configuration in `README.md` and `deploy/kubernetes-example.yaml`
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
