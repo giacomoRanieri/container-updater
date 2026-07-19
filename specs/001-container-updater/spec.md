@@ -81,6 +81,23 @@ As a system administrator, I want the system to commit and push updated YAML fil
 
 ---
 
+### User Story 5 - Repository Version Management & CI/CD Release Automation (Priority: P2)
+
+As a project maintainer and contributor, I want the repository to enforce Conventional Commits, automated Semantic Versioning, protected branches, and CI/CD pipelines for Beta and Production releases, so that external PRs can be safely reviewed/approved by maintainers and published to GitHub Releases and GHCR without manual intervention.
+
+**Why this priority**: Essential for software quality, security governance, automated changelogs, and reproducible multi-architecture releases.
+
+**Independent Test**: Can be tested by submitting a PR with Conventional Commit formatting, verifying CI status checks and maintainer approval enforcement, merging to `develop` to verify automated Beta image publishing, and merging a Release-Please PR to `master` to confirm GitHub Release creation and tagged GHCR Docker image deployment.
+
+**Acceptance Scenarios**:
+
+1. **Given** a contributor opens a Pull Request towards `develop` or `master`, **When** the PR title or commit messages fail Conventional Commits validation, **Then** the CI `commitlint` status check fails and blocks merging.
+2. **Given** a Pull Request is opened against `master` or `develop`, **When** an unapproved or direct commit is attempted, **Then** branch protection rules reject direct pushes and require at least 1 approval from a Maintainer listed in `.github/CODEOWNERS` alongside passing CI status checks.
+3. **Given** PRs are merged into `develop` using Squash & Merge, **When** the CI workflow triggers, **Then** a multi-architecture Beta Docker image is built and pushed to GHCR (tagged `:beta` and `:vX.Y.Z-beta.N`), and a GitHub Pre-release is created/updated.
+4. **Given** commits accumulate on `master` or `develop`, **When** Release-Please runs, **Then** it automatically calculates the next Semantic Version (Patch for `fix:`, Minor for `feat:`, Major for `feat!:` or `BREAKING CHANGE:`), maintains `CHANGELOG.md`, and creates a Release PR.
+5. **Given** a Release PR is approved and merged into `master`, **When** the Release CI pipeline runs, **Then** an official GitHub Release is published with release notes, binary archives, and multi-architecture Docker images are published to GHCR tagged with `:latest`, `:vX.Y.Z`, `:vX.Y`, and `:vX`.
+
+---
 
 ### Edge Cases
 
@@ -108,6 +125,11 @@ As a system administrator, I want the system to commit and push updated YAML fil
 - **FR-013**: The system MUST log all update actions and maintain an audit log / job history visible in the Web UI.
 - **FR-014**: The system MUST extract the GitHub repository source from image labels (e.g. `org.opencontainers.image.source`) and fetch the release notes / changelog from the GitHub API to enrich notification messages.
 - **FR-015**: The project MUST include GitHub Actions workflows to natively build and publish multi-architecture Docker images (linux/amd64 and linux/arm64) to GitHub Container Registry (GHCR) using matrix native runners (without QEMU emulation).
+- **FR-016**: The project MUST enforce Conventional Commits specification for all commit messages and PR titles via CI automated checks (`commitlint`).
+- **FR-017**: The project MUST use Release-Please (or equivalent SemVer release automation) to automatically calculate Semantic Versioning increments (Major, Minor, Patch) from Conventional Commits, update `CHANGELOG.md`, and generate Release PRs.
+- **FR-018**: The repository MUST implement Branch Protection rules on `master` and `develop` branches: blocking direct pushes, requiring at least 1 approval from a designated Maintainer (`.github/CODEOWNERS`), and requiring passing CI status checks before merging.
+- **FR-019**: Merges to `develop` MUST automatically trigger CI pipelines to build and push Beta multi-arch Docker images to GHCR (tagged `:beta` and `:vX.Y.Z-beta.N`) and create GitHub Pre-releases.
+- **FR-020**: Merges of Release PRs to `master` MUST automatically publish official GitHub Releases with source code archives, binary checksums, and publish tagged Docker images to GHCR (`:latest`, `:vX.Y.Z`, `:vX.Y`, `:vX`).
 
 
 

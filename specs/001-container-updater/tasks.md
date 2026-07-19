@@ -129,6 +129,18 @@
 
 ---
 
+## Phase 8: User Story 5 - Repository Version Management & CI/CD Automation (Priority: P2)
+
+**Goal**: Automate Conventional Commits linting, Release-Please SemVer PR generation, Beta/GA multi-arch GHCR image builds, and CODEOWNERS branch protection.
+
+- [x] T037 [US5] Create CODEOWNERS configuration for maintainer approvals in `.github/CODEOWNERS`
+- [x] T038 [US5] Implement Commitlint configuration and GitHub Actions workflow in `.github/commitlint.config.js` and `.github/workflows/commitlint.yml`
+- [x] T039 [US5] Implement Release-Please GitHub Actions workflow for SemVer automation and CHANGELOG updates in `.github/workflows/release-please.yml`
+- [x] T040 [US5] Update multi-arch CI/CD workflow to support Beta (`develop`) and GA Release (`master`/tags) Docker publishing to GHCR in `.github/workflows/ci-cd.yml`
+- [x] T041 [US5] Create repository contributing and branch protection documentation in `CONTRIBUTING.md`
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

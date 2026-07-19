@@ -1,23 +1,62 @@
-name: Build and Publish Multi-Arch Docker Images
+name: Multi-Arch Build and GHCR Publish (Beta & Release)
 
 on:
   push:
     branches:
-      - main
-      - 001-container-updater
+      - master
+      - develop
     tags:
       - 'v*'
   pull_request:
     branches:
-      - main
+      - master
+      - develop
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  determine-tags:
+    name: Determine Build Version & Tags
+    runs-on: ubuntu-latest
+    outputs:
+      is_release: ${{ steps.version.outputs.is_release }}
+      is_beta: ${{ steps.version.outputs.is_beta }}
+      version: ${{ steps.version.outputs.version }}
+      short_sha: ${{ steps.version.outputs.short_sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Calculate Version Tags
+        id: version
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            echo "is_release=true" >> $GITHUB_OUTPUT
+            echo "is_beta=false" >> $GITHUB_OUTPUT
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref_name }}" == "develop" ]]; then
+            # Beta build on develop branch
+            BETA_TAG="beta-${SHORT_SHA}"
+            echo "is_release=false" >> $GITHUB_OUTPUT
+            echo "is_beta=true" >> $GITHUB_OUTPUT
+            echo "version=${BETA_TAG}" >> $GITHUB_OUTPUT
+          else
+            echo "is_release=false" >> $GITHUB_OUTPUT
+            echo "is_beta=false" >> $GITHUB_OUTPUT
+            echo "version=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          fi
+
   build-matrix:
     name: Build Native Image (${{ matrix.arch }})
+    needs: determine-tags
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -35,33 +74,34 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Log in to GitHub Container Registry
+        if: ${{ github.event_name != 'pull_request' }}
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Push Backend (${{ matrix.arch }})
+      - name: Build Backend Image (${{ matrix.arch }})
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile.backend
           platforms: ${{ matrix.platform }}
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest-${{ matrix.arch }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ needs.determine-tags.outputs.version }}-${{ matrix.arch }}
 
-      - name: Build and Push Frontend (${{ matrix.arch }})
+      - name: Build Frontend Image (${{ matrix.arch }})
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile.frontend
           platforms: ${{ matrix.platform }}
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest-${{ matrix.arch }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ needs.determine-tags.outputs.version }}-${{ matrix.arch }}
 
   merge-manifests:
-    name: Merge Multi-Arch Manifests
-    needs: build-matrix
+    name: Publish Multi-Arch Manifest Lists
+    needs: [determine-tags, build-matrix]
     runs-on: ubuntu-latest
     if: ${{ github.event_name != 'pull_request' }}
     steps:
@@ -72,12 +112,52 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create and Push Multi-Arch Manifest List
+      - name: Create Multi-Arch Manifests
         run: |
-          docker buildx imagetools create --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest-amd64 \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest-arm64
+          VERSION="${{ needs.determine-tags.outputs.version }}"
+          IS_RELEASE="${{ needs.determine-tags.outputs.is_release }}"
+          IS_BETA="${{ needs.determine-tags.outputs.is_beta }}"
+          SHORT_SHA="${{ needs.determine-tags.outputs.short_sha }}"
 
-          docker buildx imagetools create --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest-amd64 \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest-arm64
+          # Base image references
+          BACKEND_AMD64="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${VERSION}-amd64"
+          BACKEND_ARM64="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${VERSION}-arm64"
+          FRONTEND_AMD64="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${VERSION}-amd64"
+          FRONTEND_ARM64="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${VERSION}-arm64"
+
+          if [[ "$IS_RELEASE" == "true" ]]; then
+            # GA Production Release Tags
+            MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1-2)
+            MAJOR=$(echo "$VERSION" | cut -d. -f1)
+
+            docker buildx imagetools create --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest \
+              --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:v${VERSION} \
+              --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:v${MAJOR_MINOR} \
+              --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:v${MAJOR} \
+              $BACKEND_AMD64 $BACKEND_ARM64
+
+            docker buildx imagetools create --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest \
+              --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:v${VERSION} \
+              --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:v${MAJOR_MINOR} \
+              --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:v${MAJOR} \
+              $FRONTEND_AMD64 $FRONTEND_ARM64
+
+          elif [[ "$IS_BETA" == "true" ]]; then
+            # Beta Release Tags on develop
+            docker buildx imagetools create --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:beta \
+              --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${VERSION} \
+              --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:sha-${SHORT_SHA} \
+              $BACKEND_AMD64 $BACKEND_ARM64
+
+            docker buildx imagetools create --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:beta \
+              --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${VERSION} \
+              --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:sha-${SHORT_SHA} \
+              $FRONTEND_AMD64 $FRONTEND_ARM64
+          else
+            # Default branch push (master without tag)
+            docker buildx imagetools create --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest \
+              $BACKEND_AMD64 $BACKEND_ARM64
+
+            docker buildx imagetools create --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest \
+              $FRONTEND_AMD64 $FRONTEND_ARM64
+          fi

@@ -1,0 +1,4 @@
+# CODEOWNERS for container-updater
+# Designated maintainers required for PR reviews and approvals on protected branches (master and develop).
+
+* @giacomo
