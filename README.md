@@ -37,22 +37,6 @@ Access the console at:
 
 ---
 
-## ☸️ Quickstart with Kubernetes
-
-You can deploy `container-updater` to your Kubernetes cluster using the provided manifest:
-
-```bash
-kubectl apply -f deploy/kubernetes-example.yaml
-```
-
-The example manifest configures:
-- Namespace `container-updater`
-- RBAC ServiceAccount with cluster permissions to monitor & patch Deployments/StatefulSets
-- Backend and Frontend deployments with `container-updater.enable: "true"`
-- Ingress controller rules and an example target deployment.
-
----
-
 ## 📦 Monitoring Workloads
 
 To allow Container Updater to monitor a service, add the following labels or annotations:
