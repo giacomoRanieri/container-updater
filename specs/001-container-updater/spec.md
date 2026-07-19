@@ -159,6 +159,7 @@ As a DevOps engineer or system administrator, I want `container-updater` to supp
 - **FR-030**: The frontend application MUST support runtime environment variable injection for backend API URL (`NEXT_PUBLIC_BACKEND_URL`) via `public/env-config.js` and container entrypoint script (`docker-entrypoint.sh`), allowing containerized frontend deployments to connect to dynamic backend URLs.
 - **FR-031**: The backend OIDC authentication service MUST support `OIDC_PROVIDER_URL` as an environment variable fallback alias for `OIDC_ISSUER`, maintaining compatibility across Kubernetes ConfigMap templates and environment configurations.
 - **FR-032**: The backend authentication module MUST dynamically resolve the frontend redirect target URL (`FRONTEND_URL` / `OIDC_FRONTEND_URL`) after successful OIDC or mock authentication callbacks, using configured environment variables, request `Referer` headers, or `Host` headers, eliminating hardcoded host assumptions.
+- **FR-033**: The database layer MUST scan aggregate SQL query timestamp results (e.g. `MAX(last_checked_at)`) safely as generic interface types or strings and parse them using multi-format timestamp parsers (`parseSQLiteTime`), preventing SQLite type scan mismatches during stats calculation (`/api/stats`).
 
 ### Key Entities *(include if feature involves data)*
 
