@@ -1,4 +1,4 @@
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+import { getBackendUrl } from "./config";
 
 export interface User {
   id: string;
@@ -13,7 +13,8 @@ export interface SessionInfo {
 
 export async function fetchSession(): Promise<SessionInfo> {
   try {
-    const res = await fetch(`${BACKEND_URL}/api/auth/session`, {
+    const backendUrl = getBackendUrl();
+    const res = await fetch(`${backendUrl}/api/auth/session`, {
       headers: {
         "Accept": "application/json",
       },
@@ -36,7 +37,8 @@ export async function fetchSession(): Promise<SessionInfo> {
 }
 
 export function redirectToLogin(): void {
-  window.location.href = `${BACKEND_URL}/api/auth/login`;
+  const backendUrl = getBackendUrl();
+  window.location.href = `${backendUrl}/api/auth/login`;
 }
 
 export function logout(): void {

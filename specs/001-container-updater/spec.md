@@ -156,6 +156,8 @@ As a DevOps engineer or system administrator, I want `container-updater` to supp
 - **FR-027**: The system MUST support mapping local Kubernetes manifest directories to host mounts (`K8S_MANIFEST_PATH_MAP`), allowing containerized `container-updater` deployments to locate and modify host Kubernetes YAML files.
 - **FR-028**: The Web UI settings page and REST API MUST expose configuration controls for Docker Compose GitOps (`COMPOSE_GITOPS_REPO_URL`, `COMPOSE_GITOPS_BRANCH`) and Kubernetes File-Based manifest options (`K8S_MANIFEST_DIR`, `K8S_FILE_BASED_ENABLED`, `K8S_MANIFEST_PATH_MAP`).
 - **FR-029**: The system MUST support automatic cluster apply (`K8S_AUTO_APPLY=true`) and external reconciliation webhooks (`K8S_SYNC_WEBHOOK_URL`) upon completing file-based Kubernetes manifest modifications.
+- **FR-030**: The frontend application MUST support runtime environment variable injection for backend API URL (`NEXT_PUBLIC_BACKEND_URL`) via `public/env-config.js` and container entrypoint script (`docker-entrypoint.sh`), allowing containerized frontend deployments to connect to dynamic backend URLs.
+- **FR-031**: The backend OIDC authentication service MUST support `OIDC_PROVIDER_URL` as an environment variable fallback alias for `OIDC_ISSUER`, maintaining compatibility across Kubernetes ConfigMap templates and environment configurations.
 
 ### Key Entities *(include if feature involves data)*
 

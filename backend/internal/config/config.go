@@ -43,9 +43,14 @@ func Load() {
 		GitHubToken:  os.Getenv("GITHUB_TOKEN"),
 	}
 
+	oidcIssuer := os.Getenv("OIDC_ISSUER")
+	if oidcIssuer == "" {
+		oidcIssuer = os.Getenv("OIDC_PROVIDER_URL")
+	}
+
 	c.OIDC = OIDCConfig{
 		Enabled:      os.Getenv("OIDC_ENABLED") == "true",
-		Issuer:       os.Getenv("OIDC_ISSUER"),
+		Issuer:       oidcIssuer,
 		ClientID:     os.Getenv("OIDC_CLIENT_ID"),
 		ClientSecret: os.Getenv("OIDC_CLIENT_SECRET"),
 		RedirectURL:  os.Getenv("OIDC_REDIRECT_URL"),

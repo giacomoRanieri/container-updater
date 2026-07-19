@@ -46,6 +46,8 @@ data:
   CRON_SCHEDULE: "*/15 * * * *"
   APPRISE_API_URL: "http://apprise-api.container-updater.svc.cluster.local:8000"
   OIDC_ENABLED: "false"
+  OIDC_ISSUER: ""
+  OIDC_PROVIDER_URL: ""
 ---
 apiVersion: apps/v1
 kind: Deployment
