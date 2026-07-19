@@ -244,18 +244,34 @@ func (c *Client) obtainToken(ctx context.Context, wwwAuthHeader, username, passw
 	return "", fmt.Errorf("empty token received")
 }
 
+// parseHeaderParams parses a Bearer Www-Authenticate parameter string
+// respecting RFC 7235 quoted strings (commas inside quotes are not delimiters).
 func parseHeaderParams(header string) map[string]string {
 	result := make(map[string]string)
-	parts := strings.Split(header, ",")
-	for _, p := range parts {
-		kv := strings.SplitN(strings.TrimSpace(p), "=", 2)
-		if len(kv) == 2 {
-			key := strings.TrimSpace(kv[0])
-			val := strings.Trim(strings.TrimSpace(kv[1]), "\"")
-			result[key] = val
+	inQuote := false
+	start := 0
+	for i := 0; i < len(header); i++ {
+		switch header[i] {
+		case '"':
+			inQuote = !inQuote
+		case ',':
+			if !inQuote {
+				parseHeaderKV(result, strings.TrimSpace(header[start:i]))
+				start = i + 1
+			}
 		}
 	}
+	parseHeaderKV(result, strings.TrimSpace(header[start:]))
 	return result
+}
+
+func parseHeaderKV(m map[string]string, s string) {
+	kv := strings.SplitN(s, "=", 2)
+	if len(kv) == 2 {
+		key := strings.TrimSpace(kv[0])
+		val := strings.Trim(strings.TrimSpace(kv[1]), "\"")
+		m[key] = val
+	}
 }
 
 func parseImageRef(imageRef string) (host, repo, tag string) {
