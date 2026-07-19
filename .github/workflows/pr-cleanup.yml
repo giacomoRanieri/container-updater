@@ -1,0 +1,47 @@
+name: Cleanup PR Preview Docker Images
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  packages: write
+  contents: read
+
+jobs:
+  cleanup-pr-images:
+    name: Delete PR Preview Docker Tags
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete PR Docker Package Tags from GHCR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner.toLowerCase();
+            const prNumber = context.payload.pull_request.number;
+            const packageNames = ['container-updater-backend', 'container-updater-frontend'];
+            const targetTag = `pr-${prNumber}`;
+
+            for (const pkg of packageNames) {
+              try {
+                console.log(`Checking package ${pkg} for tag ${targetTag}...`);
+                const versions = await github.rest.packages.getAllPackageVersionsForPackageOwnedByAuthenticatedUser({
+                  package_type: 'container',
+                  package_name: pkg
+                });
+
+                for (const ver of versions.data) {
+                  if (ver.metadata.container.tags.includes(targetTag)) {
+                    console.log(`Deleting version ${ver.id} with tag ${targetTag}...`);
+                    await github.rest.packages.deletePackageVersionForAuthenticatedUser({
+                      package_type: 'container',
+                      package_name: pkg,
+                      package_version_id: ver.id
+                    });
+                  }
+                }
+              } catch (err) {
+                console.log(`No active PR preview tag ${targetTag} found for package ${pkg} or cleanup skipped: ${err.message}`);
+              }
+            }

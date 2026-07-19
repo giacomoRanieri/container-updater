@@ -1,4 +1,4 @@
-name: Multi-Arch Build and GHCR Publish (Beta & Release)
+name: Multi-Arch Build and GHCR Publish (Beta, Release & PR Previews)
 
 on:
   push:
@@ -7,9 +7,14 @@ on:
       - develop
     tags:
       - 'v*'
+  pull_request:
+    branches:
+      - master
+      - develop
+    types: [opened, synchronize, reopened]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -27,6 +32,7 @@ jobs:
     outputs:
       is_release: ${{ steps.version.outputs.is_release }}
       is_beta: ${{ steps.version.outputs.is_beta }}
+      is_pr: ${{ steps.version.outputs.is_pr }}
       version: ${{ steps.version.outputs.version }}
       short_sha: ${{ steps.version.outputs.short_sha }}
     steps:
@@ -41,20 +47,30 @@ jobs:
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
 
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # PR Preview build (alive until PR is merged/closed)
+            PR_NUM="${{ github.event.pull_request.number }}"
+            echo "is_release=false" >> $GITHUB_OUTPUT
+            echo "is_beta=false" >> $GITHUB_OUTPUT
+            echo "is_pr=true" >> $GITHUB_OUTPUT
+            echo "version=pr-${PR_NUM}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             VERSION="${GITHUB_REF_NAME#v}"
             echo "is_release=true" >> $GITHUB_OUTPUT
             echo "is_beta=false" >> $GITHUB_OUTPUT
+            echo "is_pr=false" >> $GITHUB_OUTPUT
             echo "version=${VERSION}" >> $GITHUB_OUTPUT
           elif [[ "${{ github.ref_name }}" == "develop" ]]; then
             # Beta build on develop branch
             BETA_TAG="beta-${SHORT_SHA}"
             echo "is_release=false" >> $GITHUB_OUTPUT
             echo "is_beta=true" >> $GITHUB_OUTPUT
+            echo "is_pr=false" >> $GITHUB_OUTPUT
             echo "version=${BETA_TAG}" >> $GITHUB_OUTPUT
           else
             echo "is_release=false" >> $GITHUB_OUTPUT
             echo "is_beta=false" >> $GITHUB_OUTPUT
+            echo "is_pr=false" >> $GITHUB_OUTPUT
             echo "version=${SHORT_SHA}" >> $GITHUB_OUTPUT
           fi
 
@@ -105,6 +121,7 @@ jobs:
   merge-manifests:
     name: Publish Multi-Arch Manifest Lists
     needs: [determine-tags, build-matrix]
+    environment: beta-build
     runs-on: ubuntu-latest
     steps:
       - name: Log in to GitHub Container Registry
@@ -119,6 +136,7 @@ jobs:
           VERSION="${{ needs.determine-tags.outputs.version }}"
           IS_RELEASE="${{ needs.determine-tags.outputs.is_release }}"
           IS_BETA="${{ needs.determine-tags.outputs.is_beta }}"
+          IS_PR="${{ needs.determine-tags.outputs.is_pr }}"
           SHORT_SHA="${{ needs.determine-tags.outputs.short_sha }}"
 
           # Base image references
@@ -127,7 +145,15 @@ jobs:
           FRONTEND_AMD64="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${VERSION}-amd64"
           FRONTEND_ARM64="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${VERSION}-arm64"
 
-          if [[ "$IS_RELEASE" == "true" ]]; then
+          if [[ "$IS_PR" == "true" ]]; then
+            # PR Preview Artifacts (alive until PR is merged/closed)
+            docker buildx imagetools create --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${VERSION} \
+              $BACKEND_AMD64 $BACKEND_ARM64
+
+            docker buildx imagetools create --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${VERSION} \
+              $FRONTEND_AMD64 $FRONTEND_ARM64
+
+          elif [[ "$IS_RELEASE" == "true" ]]; then
             # GA Production Release Tags
             MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1-2)
             MAJOR=$(echo "$VERSION" | cut -d. -f1)
@@ -156,7 +182,7 @@ jobs:
               --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:sha-${SHORT_SHA} \
               $FRONTEND_AMD64 $FRONTEND_ARM64
           else
-            # Default branch push (master without tag)
+            # Default branch push
             docker buildx imagetools create --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest \
               $BACKEND_AMD64 $BACKEND_ARM64
 

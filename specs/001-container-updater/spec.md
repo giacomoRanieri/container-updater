@@ -130,6 +130,9 @@ As a project maintainer and contributor, I want the repository to enforce Conven
 - **FR-018**: The repository MUST implement Branch Protection rules on `master` and `develop` branches: blocking direct pushes, requiring at least 1 approval from a designated Maintainer (`.github/CODEOWNERS`), and requiring passing CI status checks before merging.
 - **FR-019**: Merges to `develop` MUST automatically trigger CI pipelines to build and push Beta multi-arch Docker images to GHCR (tagged `:beta` and `:vX.Y.Z-beta.N`) and create GitHub Pre-releases.
 - **FR-020**: Merges of Release PRs to `master` MUST automatically publish official GitHub Releases with source code archives, binary checksums, and publish tagged Docker images to GHCR (`:latest`, `:vX.Y.Z`, `:vX.Y`, `:vX`).
+- **FR-021**: Pull Requests MUST produce temporary PR Preview Docker images (`:pr-<N>`) on GHCR that exist only for the lifespan of the PR, and MUST be automatically deleted upon PR closure or merge via an automated cleanup workflow (`pr-cleanup.yml`).
+- **FR-022**: CI/CD pipelines MUST integrate GitHub Environment Approval Gates (`environment: beta-build`), requiring designated maintainer sign-off before publishing Docker images.
+- **FR-023**: CI/CD workflows MUST implement concurrency cancellation rules (`concurrency: cancel-in-progress: true`) to automatically abort redundant older builds when new commits are pushed.
 
 
 

@@ -138,6 +138,9 @@
 - [x] T039 [US5] Implement Release-Please GitHub Actions workflow for SemVer automation and CHANGELOG updates in `.github/workflows/release-please.yml`
 - [x] T040 [US5] Update multi-arch CI/CD workflow to support Beta (`develop`) and GA Release (`master`/tags) Docker publishing to GHCR in `.github/workflows/ci-cd.yml`
 - [x] T041 [US5] Create repository contributing and branch protection documentation in `CONTRIBUTING.md`
+- [x] T042 [US5] Implement PR Preview Docker image tag generation (`:pr-<N>`) and GitHub Environment approval gate (`environment: beta-build`) in `.github/workflows/ci-cd.yml`
+- [x] T043 [US5] Implement automated PR preview image tag deletion upon PR closure in `.github/workflows/pr-cleanup.yml`
+- [x] T044 [US5] Document PR preview artifact lifecycle and Environment Approval Gates in `CONTRIBUTING.md`
 
 ---
 

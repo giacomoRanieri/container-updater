@@ -57,3 +57,11 @@ All commit messages and PR titles **MUST** comply with the [Conventional Commits
 1. Merges to `develop` or `master` with Conventional Commits trigger **Release-Please**.
 2. Release-Please automatically maintains `CHANGELOG.md` and opens or updates a **Release PR**.
 3. Once the maintainers review and merge the Release PR into `master`, an official **GitHub Release** is tagged and published, and production multi-architecture Docker images (`:latest`, `:vX.Y.Z`, `:vX.Y`, `:vX`) are pushed to GHCR.
+
+---
+
+## 5. PR Preview Artifacts & Lifecycle Cleanup
+
+* **Temporary Preview Images**: Pull Requests build temporary preview Docker images on GHCR tagged `:pr-<number>` (e.g. `ghcr.io/giacomoranieri/container-updater-backend:pr-1`).
+* **Automated Cleanup**: These preview images exist **only while the PR is open**. As soon as the PR is closed or merged, an automated cleanup workflow (`.github/workflows/pr-cleanup.yml`) removes the temporary package tags from GHCR, ensuring zero artifact bloat.
+* **Environment Approval Gates**: Deployments use the GitHub Environment `beta-build`, requiring designated maintainer sign-off before publishing images.
