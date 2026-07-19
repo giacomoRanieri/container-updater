@@ -3,7 +3,7 @@ package monitor
 import (
 	"context"
 	"fmt"
-	"time"
+	"strings"
 
 	"container-updater/backend/internal/config"
 	"container-updater/backend/internal/db"

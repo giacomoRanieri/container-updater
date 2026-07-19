@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"container-updater/backend/internal/config"
-	"container-updater/backend/internal/logger"
 )
 
 type GitHubRelease struct {

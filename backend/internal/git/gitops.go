@@ -16,6 +16,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
+	cryptossh "golang.org/x/crypto/ssh"
 )
 
 // ProcessGitOpsCommit orchestrates cloning/pulling the repository, staging changes, committing, and pushing.
@@ -145,7 +146,7 @@ func getGitAuth() (transport.AuthMethod, error) {
 		}
 		
 		// Bypass host key verification in sandbox environments or local runs
-		publicKeys.HostKeyCallback = ssh.InsecureIgnoreHostKey()
+		publicKeys.HostKeyCallback = cryptossh.InsecureIgnoreHostKey()
 		return publicKeys, nil
 	}
 
