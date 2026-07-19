@@ -111,6 +111,8 @@ As a DevOps engineer or system administrator, I want `container-updater` to supp
 - **AC-6.3**: File-based Kubernetes updates parse local YAML manifests on disk, update the target `spec.template.spec.containers[].image` tag, and preserve original YAML formatting and indentation.
 - **AC-6.4**: File-based Kubernetes updates optionally support executing `kubectl apply -f <manifest>` or triggering local GitOps sync.
 - **AC-6.5**: The Web UI and API expose configuration fields for Compose GitOps repository settings (`COMPOSE_GITOPS_REPO_URL`, `COMPOSE_GITOPS_BRANCH`) and Kubernetes File-Based manifest paths (`K8S_MANIFEST_DIR`, `K8S_MANIFEST_PATH_MAP`).
+- **AC-6.6**: When `K8S_AUTO_APPLY=true`, `container-updater` automatically executes `kubectl apply -f <manifest>` after modifying the local Kubernetes YAML file on disk.
+- **AC-6.7**: For GitOps controllers (ArgoCD/FluxCD), `container-updater` supports pushing modified manifests to a Git repository OR dispatching an HTTP Sync Webhook (`K8S_SYNC_WEBHOOK_URL`).
 
 ---
 
@@ -153,6 +155,7 @@ As a DevOps engineer or system administrator, I want `container-updater` to supp
 - **FR-026**: When file-based Kubernetes updating is active, the system MUST parse local Kubernetes YAML manifests on disk, update the target `spec.template.spec.containers[].image` tag value, and preserve original YAML formatting and indentation.
 - **FR-027**: The system MUST support mapping local Kubernetes manifest directories to host mounts (`K8S_MANIFEST_PATH_MAP`), allowing containerized `container-updater` deployments to locate and modify host Kubernetes YAML files.
 - **FR-028**: The Web UI settings page and REST API MUST expose configuration controls for Docker Compose GitOps (`COMPOSE_GITOPS_REPO_URL`, `COMPOSE_GITOPS_BRANCH`) and Kubernetes File-Based manifest options (`K8S_MANIFEST_DIR`, `K8S_FILE_BASED_ENABLED`, `K8S_MANIFEST_PATH_MAP`).
+- **FR-029**: The system MUST support automatic cluster apply (`K8S_AUTO_APPLY=true`) and external reconciliation webhooks (`K8S_SYNC_WEBHOOK_URL`) upon completing file-based Kubernetes manifest modifications.
 
 ### Key Entities *(include if feature involves data)*
 
