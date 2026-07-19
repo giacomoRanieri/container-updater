@@ -10,6 +10,7 @@ type Config struct {
 	LogLevel      string
 	CronSchedule  string // e.g. "0 * * * *" (hourly)
 	GitHubToken   string // for API changelogs
+	FrontendURL   string // optional explicit frontend redirect URL
 	OIDC          OIDCConfig
 	GitOps        GitOpsConfig
 }
@@ -41,6 +42,7 @@ func Load() {
 		LogLevel:     getEnv("LOG_LEVEL", "info"),
 		CronSchedule: getEnv("CRON_SCHEDULE", "*/15 * * * *"), // Default check: every 15 minutes
 		GitHubToken:  os.Getenv("GITHUB_TOKEN"),
+		FrontendURL:  getEnv("FRONTEND_URL", os.Getenv("OIDC_FRONTEND_URL")),
 	}
 
 	oidcIssuer := os.Getenv("OIDC_ISSUER")
