@@ -148,11 +148,25 @@
 
 **Goal**: Support GitOps workflow for Docker Compose stacks and file-based local disk manifest updates for Kubernetes.
 
-- [ ] T045 [US6] Implement GitOps synchronization module for Docker Compose stacks (`COMPOSE_GITOPS_ENABLED`) in `backend/internal/git/compose_gitops.go`
-- [ ] T046 [US6] Implement local file-based Kubernetes manifest parser and updater (`K8S_FILE_BASED_ENABLED`, `K8S_MANIFEST_DIR`) in `backend/internal/k8s/file_updater.go`
-- [ ] T047 [US6] Implement path mapping utility for host-to-container Kubernetes manifest directories (`K8S_MANIFEST_PATH_MAP`) in `backend/internal/k8s/path_map.go`
-- [ ] T048 [US6] Expose Compose GitOps and Kubernetes File-Based configuration settings in REST API and Web UI settings page in `frontend/src/app/settings/page.tsx`
-- [ ] T049 [US6] Document Docker Compose GitOps and Kubernetes File-Based configuration in `README.md` and `deploy/kubernetes-example.yaml`
+- [x] T045 [US6] Implement GitOps synchronization module for Docker Compose stacks (`COMPOSE_GITOPS_ENABLED`) in `backend/internal/git/compose_gitops.go`
+- [x] T046 [US6] Implement local file-based Kubernetes manifest parser and updater (`K8S_FILE_BASED_ENABLED`, `K8S_MANIFEST_DIR`) in `backend/internal/k8s/file_updater.go`
+- [x] T047 [US6] Implement path mapping utility for host-to-container Kubernetes manifest directories (`K8S_MANIFEST_PATH_MAP`) in `backend/internal/k8s/path_map.go`
+- [x] T048 [US6] Expose Compose GitOps and Kubernetes File-Based configuration settings in REST API and Web UI settings page in `frontend/src/app/settings/page.tsx`
+- [x] T049 [US6] Document Docker Compose GitOps and Kubernetes File-Based configuration in `README.md` and `deploy/kubernetes-example.yaml`
+
+---
+
+## Phase 10: Bug Fixes, Daemonless Monitoring & SemVer Updates
+
+**Goal**: Resolve runtime configuration, SQLite driver type casting, daemonless OCI registry inspection, UI layout overlap, and SemVer version tracking.
+
+- [x] T050 Fix OIDC provider URL fallback in `backend/internal/config/config.go` and update `deploy/kubernetes-example.yaml` (Issue #12)
+- [x] T051 Implement runtime `NEXT_PUBLIC_BACKEND_URL` injection in `frontend/docker-entrypoint.sh` and `frontend/src/services/config.ts` (Issue #13)
+- [x] T052 Implement safe SQLite timestamp type scanning `db.ParseTime` in `backend/internal/db/utils.go` and `/api/stats` (Issue #15)
+- [x] T053 Enable monitor registry checks for Kubernetes workloads without requiring local Docker daemon socket in `backend/internal/monitor/scheduler.go` (Issue #16)
+- [x] T054 Implement pure HTTP OCI Registry v2 client in `backend/internal/registry/client.go` for daemonless digest checks (Issue #17)
+- [x] T055 Fix UI workload card badge overlap, flexbox positioning, title truncation, and add `POST /api/scan` endpoint (Issue #18)
+- [x] T056 Implement SemVer / CalVer tag tracking (`FindLatestMatchingTag`) in `backend/internal/registry/semver.go` (Issue #19)
 
 ---
 
