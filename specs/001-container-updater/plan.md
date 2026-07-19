@@ -103,6 +103,10 @@ frontend/
 Dockerfile.backend       # Multi-stage build for Go backend daemon
 Dockerfile.frontend      # Multi-stage build for Next.js frontend
 docker-compose.yml       # Docker Compose definition for containerized run
+.github/
+└── workflows/
+    └── ci-cd.yml        # GitHub Actions matrix build (amd64/arm64) and GHCR push
+
 
 ```
 

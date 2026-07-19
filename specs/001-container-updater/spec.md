@@ -107,6 +107,8 @@ As a system administrator, I want the system to commit and push updated YAML fil
 - **FR-012**: The system MUST support storing and using registry authentication credentials to check private registries.
 - **FR-013**: The system MUST log all update actions and maintain an audit log / job history visible in the Web UI.
 - **FR-014**: The system MUST extract the GitHub repository source from image labels (e.g. `org.opencontainers.image.source`) and fetch the release notes / changelog from the GitHub API to enrich notification messages.
+- **FR-015**: The project MUST include GitHub Actions workflows to natively build and publish multi-architecture Docker images (linux/amd64 and linux/arm64) to GitHub Container Registry (GHCR) using matrix native runners (without QEMU emulation).
+
 
 
 

@@ -125,6 +125,7 @@
 - [ ] T033 [P] Create multi-stage container deployment configurations in `Dockerfile.backend`, `Dockerfile.frontend`, and `docker-compose.yml`
 - [ ] T034 Update `README.md` with container build, volume mount, and deployment instructions
 - [ ] T035 Run end-to-end validation scenarios documented in `specs/001-container-updater/quickstart.md`
+- [ ] T036 [P] Create GitHub Actions matrix build workflow (amd64/arm64) and GHCR push without QEMU emulation in `.github/workflows/ci-cd.yml`
 
 ---
 
