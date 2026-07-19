@@ -58,8 +58,9 @@ func NewRouter() http.Handler {
 
 		r.Get("/api/auth/session", HandleSession)
 		
-		// Workloads
+		// Workloads & Scan
 		r.Get("/api/workloads", HandleListWorkloads)
+		r.Post("/api/scan", HandleTriggerScan)
 		r.Post("/api/workloads/{id}/update", HandleTriggerUpdate)
 		r.Get("/api/audit-logs", HandleListAuditLogs)
 		r.Get("/api/stats", HandleGetStats)
