@@ -20,7 +20,7 @@ COPY frontend/ ./
 # Disable next telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN pnpm build
+RUN npm run build
 
 FROM base AS runner
 WORKDIR /app
@@ -41,4 +41,4 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["pnpm", "start"]
+CMD ["npm", "run", "start"]
