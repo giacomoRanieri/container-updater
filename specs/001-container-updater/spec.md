@@ -166,6 +166,7 @@ As a DevOps engineer or system administrator, I want `container-updater` to supp
 - **FR-037**: The system MUST expose a protected `POST /api/scan` API endpoint allowing users to trigger an immediate, on-demand background registry update check across all monitored workloads without waiting for the scheduled cron interval.
 - **FR-038**: The monitor service MUST support Semantic Versioning (SemVer) and CalVer tag tracking (`registry.FindLatestMatchingTag`), listing remote registry tags via OCI v2 API (`GET /v2/<repo>/tags/list`) and detecting newer release version tags (e.g. `2026.6.4` -> `2026.6.5`) even when image tags are version-pinned.
 - **FR-039**: The OCI registry HTTP client MUST parse `Www-Authenticate` Bearer header parameters using an RFC 7235–compliant quoted-string-aware parser, ensuring the `scope` field is correctly extracted even when it contains colons or commas inside quoted values.
+- **FR-040**: The OCI registry HTTP client `ListTags` implementation MUST paginate through all registry tag pages by following RFC 5988 `Link: rel="next"` response headers until all tags are fetched, preventing missed newer tags for repositories with more than 100 releases.
 
 ### Key Entities *(include if feature involves data)*
 

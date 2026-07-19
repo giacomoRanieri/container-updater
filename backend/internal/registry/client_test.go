@@ -43,3 +43,34 @@ func TestParseHeaderParams_ScopeWithColons(t *testing.T) {
 		t.Errorf("scope = %q, want %q", params["scope"], "repository:foo/bar:pull,push")
 	}
 }
+
+func TestParseLinkNext_ValidRelative(t *testing.T) {
+	link := `</v2/home-assistant/home-assistant/tags/list?last=2021.6.0&n=100>; rel="next"`
+	got := parseLinkNext(link, "ghcr.io")
+	want := "https://ghcr.io/v2/home-assistant/home-assistant/tags/list?last=2021.6.0&n=100"
+	if got != want {
+		t.Errorf("parseLinkNext() = %q, want %q", got, want)
+	}
+}
+
+func TestParseLinkNext_ValidAbsolute(t *testing.T) {
+	link := `<https://ghcr.io/v2/home-assistant/home-assistant/tags/list?last=tag100&n=100>; rel="next"`
+	got := parseLinkNext(link, "ghcr.io")
+	want := "https://ghcr.io/v2/home-assistant/home-assistant/tags/list?last=tag100&n=100"
+	if got != want {
+		t.Errorf("parseLinkNext() = %q, want %q", got, want)
+	}
+}
+
+func TestParseLinkNext_Empty(t *testing.T) {
+	if got := parseLinkNext("", "ghcr.io"); got != "" {
+		t.Errorf("parseLinkNext(\"\") = %q, want empty", got)
+	}
+}
+
+func TestParseLinkNext_NoNextRel(t *testing.T) {
+	link := `</v2/repo/tags/list?last=foo&n=100>; rel="last"`
+	if got := parseLinkNext(link, "ghcr.io"); got != "" {
+		t.Errorf("parseLinkNext with rel=last = %q, want empty", got)
+	}
+}
