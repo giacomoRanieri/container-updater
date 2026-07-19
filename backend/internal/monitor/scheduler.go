@@ -104,17 +104,15 @@ func (s *MonitorScheduler) RunCheck(ctx context.Context) {
 		}
 
 		// Run comparison check against registry
-		if s.dockerClient != nil {
-			isNewUpdate, err := CheckWorkloadUpdate(ctx, s.dockerClient, w)
-			if err != nil {
-				logger.Log.Error("registry check failed for workload", "name", w.Name, "error", err)
-				w.UpdateStatus = "failed"
-			} else if isNewUpdate {
-				// Only notify if update status changed to 'update_available' or if we hadn't notified yet
-				if existing == nil || existing.UpdateStatus != "update_available" {
-					logger.Log.Info("new update detected, preparing notification...", "workload", w.Name)
-					s.notifyUpdate(ctx, w)
-				}
+		isNewUpdate, err := CheckWorkloadUpdate(ctx, s.dockerClient, w)
+		if err != nil {
+			logger.Log.Error("registry check failed for workload", "name", w.Name, "error", err)
+			w.UpdateStatus = "failed"
+		} else if isNewUpdate {
+			// Only notify if update status changed to 'update_available' or if we hadn't notified yet
+			if existing == nil || existing.UpdateStatus != "update_available" {
+				logger.Log.Info("new update detected, preparing notification...", "workload", w.Name)
+				s.notifyUpdate(ctx, w)
 			}
 		}
 

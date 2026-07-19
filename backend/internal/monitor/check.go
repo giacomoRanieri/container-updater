@@ -18,6 +18,15 @@ import (
 
 // CheckWorkloadUpdate compares the running digest of a workload with its remote registry digest
 func CheckWorkloadUpdate(ctx context.Context, dockerClient *docker.DockerClient, w *db.Workload) (bool, error) {
+	if dockerClient == nil {
+		fallback, err := docker.NewDockerClient()
+		if err != nil {
+			return false, errors.New("registry client unavailable for distribution inspect")
+		}
+		dockerClient = fallback
+		defer fallback.Close()
+	}
+
 	// 1. Resolve registry host from image name
 	registryHost := resolveRegistryHost(w.CurrentImage)
 
