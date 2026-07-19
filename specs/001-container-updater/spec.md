@@ -158,6 +158,7 @@ As a DevOps engineer or system administrator, I want `container-updater` to supp
 - **FR-029**: The system MUST support automatic cluster apply (`K8S_AUTO_APPLY=true`) and external reconciliation webhooks (`K8S_SYNC_WEBHOOK_URL`) upon completing file-based Kubernetes manifest modifications.
 - **FR-030**: The frontend application MUST support runtime environment variable injection for backend API URL (`NEXT_PUBLIC_BACKEND_URL`) via `public/env-config.js` and container entrypoint script (`docker-entrypoint.sh`), allowing containerized frontend deployments to connect to dynamic backend URLs.
 - **FR-031**: The backend OIDC authentication service MUST support `OIDC_PROVIDER_URL` as an environment variable fallback alias for `OIDC_ISSUER`, maintaining compatibility across Kubernetes ConfigMap templates and environment configurations.
+- **FR-032**: The backend authentication module MUST dynamically resolve the frontend redirect target URL (`FRONTEND_URL` / `OIDC_FRONTEND_URL`) after successful OIDC or mock authentication callbacks, using configured environment variables, request `Referer` headers, or `Host` headers, eliminating hardcoded host assumptions.
 
 ### Key Entities *(include if feature involves data)*
 
