@@ -94,13 +94,30 @@ spec: ...
 | `GITHUB_TOKEN` | *None* | Optional GitHub API token to prevent rate limits during changelog lookup |
 | `APPRISE_API_URL` | `http://localhost:8000` | Connection string for Apprise notification API |
 | `OIDC_ENABLED` | `false` | Enable OIDC single sign-on authentication |
-| `COMPOSE_PATH_MAP` | *None* | Maps container host paths to local mounts |
-
-### GitOps Configuration
+### Docker Compose GitOps Configuration
 
 | Variable | Default | Description |
 |---|---|---|
-| `GITOPS_ENABLED` | `false` | Enable automated Git push on Kubernetes manifest updates |
+| `COMPOSE_PATH_MAP` | *None* | Maps host compose file paths to container mounts (format: `/host/path:/container/path`) |
+| `COMPOSE_GITOPS_ENABLED` | `false` | Enable automated Git repository sync for Docker Compose stacks |
+| `COMPOSE_GITOPS_REPO_URL` | *None* | Remote Git repository URL containing `docker-compose.yml` files |
+| `COMPOSE_GITOPS_BRANCH` | `main` | Target Git repository branch for Compose updates |
+
+### Kubernetes File-Based & Reconciliation Configuration
+
+| Variable | Default | Description |
+|---|---|---|
+| `K8S_FILE_BASED_ENABLED` | `false` | Enable local file-based Kubernetes manifest updates on disk |
+| `K8S_MANIFEST_DIR` | `/app/k8s-manifests` | Local directory containing Kubernetes Deployment/StatefulSet/DaemonSet YAML files |
+| `K8S_MANIFEST_PATH_MAP` | *None* | Maps host Kubernetes manifest directories to container mounts |
+| `K8S_AUTO_APPLY` | `true` | Automatically run `kubectl apply -f` after modifying manifest YAML on disk |
+| `K8S_SYNC_WEBHOOK_URL` | *None* | Optional HTTP webhook URL to trigger GitOps sync (e.g. ArgoCD/FluxCD sync endpoint) |
+
+### GitOps Credentials
+
+| Variable | Default | Description |
+|---|---|---|
+| `GITOPS_ENABLED` | `false` | Enable automated Git push on manifest updates |
 | `GITOPS_REPO_URL` | *None* | Remote Git repository SSH/HTTPS URL |
 | `GITOPS_BRANCH` | `main` | Target repository branch |
 | `GITOPS_SSH_KEY_PATH`| *None* | SSH Private key file path for authentication |
