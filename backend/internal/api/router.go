@@ -34,9 +34,11 @@ func NewRouter() http.Handler {
 	r.Use(RequestLogger)
 	r.Use(middleware.Recoverer)
 
-	// CORS config
+	// Dynamic CORS config
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:3000", "http://localhost:3001"},
+		AllowOriginFunc: func(r *http.Request, origin string) bool {
+			return true
+		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},

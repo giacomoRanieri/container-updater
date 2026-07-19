@@ -39,12 +39,20 @@ func GetUpdateJob(id string) (*UpdateJob, error) {
 
 	j := &UpdateJob{}
 	var errMsg sql.NullString
-	err := row.Scan(&j.ID, &j.WorkloadID, &j.Status, &errMsg, &j.CreatedAt, &j.UpdatedAt)
+	var createdAtVal, updatedAtVal interface{}
+	err := row.Scan(&j.ID, &j.WorkloadID, &j.Status, &errMsg, &createdAtVal, &updatedAtVal)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
+	}
+
+	if t, err := ParseTime(createdAtVal); err == nil {
+		j.CreatedAt = t
+	}
+	if t, err := ParseTime(updatedAtVal); err == nil {
+		j.UpdatedAt = t
 	}
 
 	if errMsg.Valid {
