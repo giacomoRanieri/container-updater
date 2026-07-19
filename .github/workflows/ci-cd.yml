@@ -16,6 +16,10 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: giacomoranieri/container-updater
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   determine-tags:
     name: Determine Build Version & Tags
