@@ -30,8 +30,42 @@ func CheckWorkloadUpdate(ctx context.Context, dockerClient *docker.DockerClient,
 		logger.Log.Error("database query failed for registry credentials", "registry", registryHost, "error", err)
 	}
 
-	// 3. Query remote OCI registry directly via HTTP (no Docker daemon required)
+	// 3. Query remote OCI registry directly via HTTP
 	regClient := registry.NewClient()
+
+	// 3a. Attempt SemVer tag tracking if current image tag is a version
+	currentTag := "latest"
+	if idx := strings.LastIndex(w.CurrentImage, ":"); idx != -1 && !strings.Contains(w.CurrentImage[idx:], "/") {
+		currentTag = w.CurrentImage[idx+1:]
+	}
+
+	if currentTag != "latest" {
+		tags, err := regClient.ListTags(ctx, w.CurrentImage, username, password)
+		if err == nil {
+			if latestSemverTag, found := registry.FindLatestMatchingTag(currentTag, tags); found {
+				repo := w.CurrentImage
+				if idx := strings.LastIndex(repo, ":"); idx != -1 && !strings.Contains(repo[idx:], "/") {
+					repo = repo[:idx]
+				}
+				newerImageRef := repo + ":" + latestSemverTag
+				newerDigest, err := regClient.FetchDigest(ctx, newerImageRef, username, password)
+				if err == nil {
+					cleanNewerDigest := strings.TrimPrefix(newerDigest, "sha256:")
+					logger.Log.Info("New SemVer release tag found", "workload", w.Name, "currentTag", currentTag, "newerTag", latestSemverTag)
+					w.NewImage = &newerImageRef
+					w.NewDigest = &cleanNewerDigest
+					w.UpdateStatus = "update_available"
+					now := time.Now()
+					w.LastCheckedAt = &now
+					return true, nil
+				}
+			}
+		} else {
+			logger.Log.Debug("Tag listing not supported or failed, falling back to digest check", "image", w.CurrentImage, "error", err)
+		}
+	}
+
+	// 3b. Fallback to same-tag digest comparison
 	cleanRemote, err := regClient.FetchDigest(ctx, w.CurrentImage, username, password)
 	if err != nil {
 		logger.Log.Warn("HTTP OCI registry inspect failed, trying Docker client fallback", "image", w.CurrentImage, "error", err)

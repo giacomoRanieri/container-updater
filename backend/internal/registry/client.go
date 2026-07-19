@@ -118,6 +118,57 @@ func (c *Client) fetchDigestViaGet(ctx context.Context, manifestURL, username, p
 	return strings.TrimPrefix(digest, "sha256:"), nil
 }
 
+// ListTags queries the OCI Registry v2 API endpoint GET /v2/<name>/tags/list
+func (c *Client) ListTags(ctx context.Context, imageRef, username, password string) ([]string, error) {
+	host, repo, _ := parseImageRef(imageRef)
+	tagsURL := fmt.Sprintf("https://%s/v2/%s/tags/list", host, repo)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, tagsURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed HTTP request to list tags from %s: %w", host, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		authHeader := resp.Header.Get("Www-Authenticate")
+		token, err := c.obtainToken(ctx, authHeader, username, password)
+		if err != nil {
+			return nil, fmt.Errorf("registry auth failed for %s: %w", host, err)
+		}
+
+		req, err = http.NewRequestWithContext(ctx, http.MethodGet, tagsURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		resp, err = c.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("failed authenticated tag list request to %s: %w", host, err)
+		}
+		defer resp.Body.Close()
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("registry returned HTTP %d for %s", resp.StatusCode, tagsURL)
+	}
+
+	var tagResp struct {
+		Name string   `json:"name"`
+		Tags []string `json:"tags"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&tagResp); err != nil {
+		return nil, err
+	}
+
+	return tagResp.Tags, nil
+}
+
 func setManifestHeaders(req *http.Request) {
 	req.Header.Set("Accept", strings.Join([]string{
 		"application/vnd.docker.distribution.manifest.v2+json",
