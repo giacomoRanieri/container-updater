@@ -63,7 +63,7 @@ func (k *K8sClient) ListMonitoredWorkloads(ctx context.Context) ([]*db.Workload,
 				digest := k.getRunningDigest(ctx, dep.Namespace, "Deployment", dep.Name, container.Name)
 				workloads = append(workloads, &db.Workload{
 					ID:               fmt.Sprintf("k8s-%s-deploy-%s-%s", dep.Namespace, dep.Name, container.Name),
-					Name:             fmt.Sprintf("%s/%s", dep.Name, container.Name),
+					Name:             formatWorkloadName(dep.Name, container.Name),
 					NamespaceProject: dep.Namespace,
 					OrchestratorType: "kubernetes",
 					CurrentImage:     container.Image,
@@ -88,7 +88,7 @@ func (k *K8sClient) ListMonitoredWorkloads(ctx context.Context) ([]*db.Workload,
 				digest := k.getRunningDigest(ctx, sts.Namespace, "StatefulSet", sts.Name, container.Name)
 				workloads = append(workloads, &db.Workload{
 					ID:               fmt.Sprintf("k8s-%s-sts-%s-%s", sts.Namespace, sts.Name, container.Name),
-					Name:             fmt.Sprintf("%s/%s", sts.Name, container.Name),
+					Name:             formatWorkloadName(sts.Name, container.Name),
 					NamespaceProject: sts.Namespace,
 					OrchestratorType: "kubernetes",
 					CurrentImage:     container.Image,
@@ -113,7 +113,7 @@ func (k *K8sClient) ListMonitoredWorkloads(ctx context.Context) ([]*db.Workload,
 				digest := k.getRunningDigest(ctx, ds.Namespace, "DaemonSet", ds.Name, container.Name)
 				workloads = append(workloads, &db.Workload{
 					ID:               fmt.Sprintf("k8s-%s-ds-%s-%s", ds.Namespace, ds.Name, container.Name),
-					Name:             fmt.Sprintf("%s/%s", ds.Name, container.Name),
+					Name:             formatWorkloadName(ds.Name, container.Name),
 					NamespaceProject: ds.Namespace,
 					OrchestratorType: "kubernetes",
 					CurrentImage:     container.Image,
@@ -128,6 +128,13 @@ func (k *K8sClient) ListMonitoredWorkloads(ctx context.Context) ([]*db.Workload,
 	}
 
 	return workloads, nil
+}
+
+func formatWorkloadName(workloadName, containerName string) string {
+	if workloadName == containerName || strings.HasSuffix(workloadName, "-"+containerName) || strings.HasPrefix(containerName, workloadName) {
+		return workloadName
+	}
+	return fmt.Sprintf("%s/%s", workloadName, containerName)
 }
 
 // getRunningDigest fetches the pod statuses for the workload and extracts the actual ImageID registry digest.
