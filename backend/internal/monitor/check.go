@@ -12,21 +12,13 @@ import (
 	"container-updater/backend/internal/db"
 	"container-updater/backend/internal/docker"
 	"container-updater/backend/internal/logger"
+	"container-updater/backend/internal/registry"
 
-	"github.com/docker/docker/api/types/registry"
+	dockertypes "github.com/docker/docker/api/types/registry"
 )
 
 // CheckWorkloadUpdate compares the running digest of a workload with its remote registry digest
 func CheckWorkloadUpdate(ctx context.Context, dockerClient *docker.DockerClient, w *db.Workload) (bool, error) {
-	if dockerClient == nil {
-		fallback, err := docker.NewDockerClient()
-		if err != nil {
-			return false, errors.New("registry client unavailable for distribution inspect")
-		}
-		dockerClient = fallback
-		defer fallback.Close()
-	}
-
 	// 1. Resolve registry host from image name
 	registryHost := resolveRegistryHost(w.CurrentImage)
 
@@ -34,10 +26,44 @@ func CheckWorkloadUpdate(ctx context.Context, dockerClient *docker.DockerClient,
 	var username, password string
 	query := `SELECT username, password FROM registry_credentials WHERE server_address = ?`
 	err := db.DB.QueryRow(query, registryHost).Scan(&username, &password)
-	
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		logger.Log.Error("database query failed for registry credentials", "registry", registryHost, "error", err)
+	}
+
+	// 3. Query remote OCI registry directly via HTTP (no Docker daemon required)
+	regClient := registry.NewClient()
+	cleanRemote, err := regClient.FetchDigest(ctx, w.CurrentImage, username, password)
+	if err != nil {
+		logger.Log.Warn("HTTP OCI registry inspect failed, trying Docker client fallback", "image", w.CurrentImage, "error", err)
+		if dockerClient != nil {
+			return checkViaDockerClient(ctx, dockerClient, w, registryHost, username, password)
+		}
+		return false, err
+	}
+
+	cleanCurrent := strings.TrimPrefix(w.CurrentDigest, "sha256:")
+	logger.Log.Info("Compare image digests", "workload", w.Name, "current", cleanCurrent, "remote", cleanRemote)
+
+	w.NewDigest = &cleanRemote
+	now := time.Now()
+	w.LastCheckedAt = &now
+
+	if cleanRemote != cleanCurrent && cleanCurrent != "" {
+		w.NewImage = &w.CurrentImage
+		w.UpdateStatus = "update_available"
+		return true, nil
+	}
+
+	w.NewImage = nil
+	w.NewDigest = nil
+	w.UpdateStatus = "up_to_date"
+	return false, nil
+}
+
+func checkViaDockerClient(ctx context.Context, dockerClient *docker.DockerClient, w *db.Workload, registryHost, username, password string) (bool, error) {
 	var encodedAuth string
-	if err == nil {
-		authConfig := registry.AuthConfig{
+	if username != "" && password != "" {
+		authConfig := dockertypes.AuthConfig{
 			Username:      username,
 			Password:      password,
 			ServerAddress: registryHost,
@@ -46,21 +72,15 @@ func CheckWorkloadUpdate(ctx context.Context, dockerClient *docker.DockerClient,
 		if err == nil {
 			encodedAuth = base64.URLEncoding.EncodeToString(authBytes)
 		}
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		logger.Log.Error("database query failed for registry credentials", "registry", registryHost, "error", err)
 	}
 
-	// 3. Resolve the remote image reference (prepend docker.io if needed)
 	fullImageName := w.CurrentImage
 	if !strings.Contains(fullImageName, "/") {
 		fullImageName = "docker.io/library/" + fullImageName
 	} else if !strings.Contains(strings.Split(fullImageName, "/")[0], ".") && !strings.Contains(strings.Split(fullImageName, "/")[0], ":") {
-		// e.g. "username/repo:tag" -> "docker.io/username/repo:tag"
 		fullImageName = "docker.io/" + fullImageName
 	}
 
-	// 4. Query distribution inspect to get remote digest
-	logger.Log.Debug("inspecting distribution info from registry", "image", fullImageName, "host", registryHost)
 	inspect, err := dockerClient.DistributionInspect(ctx, fullImageName, encodedAuth)
 	if err != nil {
 		return false, err
@@ -71,18 +91,15 @@ func CheckWorkloadUpdate(ctx context.Context, dockerClient *docker.DockerClient,
 		return false, errors.New("empty remote digest returned from registry")
 	}
 
-	// Normalize digests (remove prefix like sha256: if present for strict comparison)
 	cleanRemote := strings.TrimPrefix(remoteDigest, "sha256:")
 	cleanCurrent := strings.TrimPrefix(w.CurrentDigest, "sha256:")
 
-	logger.Log.Info("Compare image digests", "workload", w.Name, "current", cleanCurrent, "remote", cleanRemote)
-
+	w.NewDigest = &cleanRemote
 	now := time.Now()
 	w.LastCheckedAt = &now
 
-	if cleanRemote != cleanCurrent {
+	if cleanRemote != cleanCurrent && cleanCurrent != "" {
 		w.NewImage = &w.CurrentImage
-		w.NewDigest = &remoteDigest
 		w.UpdateStatus = "update_available"
 		return true, nil
 	}

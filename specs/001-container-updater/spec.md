@@ -161,6 +161,7 @@ As a DevOps engineer or system administrator, I want `container-updater` to supp
 - **FR-032**: The backend authentication module MUST dynamically resolve the frontend redirect target URL (`FRONTEND_URL` / `OIDC_FRONTEND_URL`) after successful OIDC or mock authentication callbacks, using configured environment variables, request `Referer` headers, or `Host` headers, eliminating hardcoded host assumptions.
 - **FR-033**: The database layer MUST scan aggregate SQL query timestamp results (e.g. `MAX(last_checked_at)`) safely as generic interface types or strings and parse them using multi-format timestamp parsers (`parseSQLiteTime`), preventing SQLite type scan mismatches during stats calculation (`/api/stats`).
 - **FR-034**: The monitor scheduler MUST execute remote registry digest inspection (`CheckWorkloadUpdate`) for all scanned workloads (including Kubernetes workloads) regardless of whether the local Docker daemon client socket is connected or available.
+- **FR-035**: The system MUST implement a native HTTP/HTTPS OCI Registry v2 client (`registry.Client`) to query remote image digests directly over HTTP without requiring a running Docker Engine daemon or socket.
 
 ### Key Entities *(include if feature involves data)*
 
