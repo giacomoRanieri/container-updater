@@ -5,7 +5,9 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"container-updater/backend/internal/config"
@@ -94,7 +96,7 @@ func HandleCallback(w http.ResponseWriter, r *http.Request) {
 		setSessionCookie(w, token)
 		
 		// Redirect back to frontend homepage (Next.js)
-		frontendURL := "http://localhost:3000"
+		frontendURL := getFrontendRedirectURL(r)
 		logger.Log.Info("Mock auth successful, redirecting to frontend", "url", frontendURL)
 		http.Redirect(w, r, frontendURL, http.StatusFound)
 		return
@@ -172,9 +174,35 @@ func HandleCallback(w http.ResponseWriter, r *http.Request) {
 	setSessionCookie(w, token)
 
 	// Redirect to frontend
-	frontendURL := "http://localhost:3000"
+	frontendURL := getFrontendRedirectURL(r)
 	logger.Log.Info("OIDC authentication successful", "user", claims.Name, "redirect", frontendURL)
 	http.Redirect(w, r, frontendURL, http.StatusFound)
+}
+
+func getFrontendRedirectURL(r *http.Request) string {
+	// 1. Explicit environment variable: FRONTEND_URL
+	if feURL := config.GlobalConfig.FrontendURL; feURL != "" {
+		return feURL
+	}
+
+	// 2. Derive base host from Referer header if present
+	if ref := r.Header.Get("Referer"); ref != "" {
+		if parsed, err := url.Parse(ref); err == nil && parsed.Scheme != "" && parsed.Host != "" {
+			return fmt.Sprintf("%s://%s", parsed.Scheme, parsed.Host)
+		}
+	}
+
+	// 3. Fallback to request scheme and Host header
+	scheme := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	if r.Host != "" {
+		return fmt.Sprintf("%s://%s", scheme, r.Host)
+	}
+
+	// 4. Default fallback
+	return "http://localhost:3000"
 }
 
 func HandleSession(w http.ResponseWriter, r *http.Request) {

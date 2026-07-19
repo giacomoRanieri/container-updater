@@ -32,12 +32,16 @@ func GetNotificationService(id string) (*NotificationService, error) {
 	row := DB.QueryRow(query, id)
 
 	n := &NotificationService{}
-	err := row.Scan(&n.ID, &n.Name, &n.AppriseURL, &n.IsEnabled, &n.CreatedAt)
+	var createdAtVal interface{}
+	err := row.Scan(&n.ID, &n.Name, &n.AppriseURL, &n.IsEnabled, &createdAtVal)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
+	}
+	if t, err := ParseTime(createdAtVal); err == nil {
+		n.CreatedAt = t
 	}
 	return n, nil
 }
@@ -53,9 +57,13 @@ func ListNotificationServices() ([]*NotificationService, error) {
 	var list []*NotificationService
 	for rows.Next() {
 		n := &NotificationService{}
-		err := rows.Scan(&n.ID, &n.Name, &n.AppriseURL, &n.IsEnabled, &n.CreatedAt)
+		var createdAtVal interface{}
+		err := rows.Scan(&n.ID, &n.Name, &n.AppriseURL, &n.IsEnabled, &createdAtVal)
 		if err != nil {
 			return nil, err
+		}
+		if t, err := ParseTime(createdAtVal); err == nil {
+			n.CreatedAt = t
 		}
 		list = append(list, n)
 	}

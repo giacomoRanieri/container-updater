@@ -1,5 +1,4 @@
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
-const WS_URL = BACKEND_URL.replace(/^http/, "ws") + "/api/ws";
+import { getBackendUrl, getWebSocketUrl } from "./config";
 
 export interface Workload {
   id: string;
@@ -42,7 +41,8 @@ export interface NotificationService {
 
 // Fetch helper with standard headers and credentials
 async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const url = `${BACKEND_URL}${path}`;
+  const backendUrl = getBackendUrl();
+  const url = `${backendUrl}${path}`;
   const response = await fetch(url, {
     ...options,
     headers: {
@@ -57,7 +57,7 @@ async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T
     if (response.status === 401) {
       // Prompt OIDC redirect
       if (typeof window !== "undefined") {
-        window.location.href = `${BACKEND_URL}/api/auth/login`;
+        window.location.href = `${backendUrl}/api/auth/login`;
       }
     }
     throw new Error(`API error ${response.status}: ${response.statusText}`);
@@ -111,8 +111,9 @@ export function connectWebSocket(
   function connect() {
     if (isClosed) return;
 
-    logger("Attempting WebSocket connection to " + WS_URL);
-    ws = new WebSocket(WS_URL);
+    const wsUrl = getWebSocketUrl();
+    logger("Attempting WebSocket connection to " + wsUrl);
+    ws = new WebSocket(wsUrl);
 
     ws.onmessage = (event) => {
       try {

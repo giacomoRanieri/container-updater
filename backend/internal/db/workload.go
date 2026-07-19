@@ -55,10 +55,10 @@ func GetWorkload(id string) (*Workload, error) {
 	row := DB.QueryRow(query, id)
 
 	w := &Workload{}
-	var lastChecked, lastUpdated sql.NullTime
+	var lastCheckedVal, lastUpdatedVal interface{}
 	err := row.Scan(
 		&w.ID, &w.Name, &w.NamespaceProject, &w.OrchestratorType, &w.CurrentImage, &w.CurrentDigest,
-		&w.NewImage, &w.NewDigest, &w.UpdateStatus, &lastChecked, &lastUpdated,
+		&w.NewImage, &w.NewDigest, &w.UpdateStatus, &lastCheckedVal, &lastUpdatedVal,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -67,11 +67,11 @@ func GetWorkload(id string) (*Workload, error) {
 		return nil, err
 	}
 
-	if lastChecked.Valid {
-		w.LastCheckedAt = &lastChecked.Time
+	if t, err := ParseTime(lastCheckedVal); err == nil && !t.IsZero() {
+		w.LastCheckedAt = &t
 	}
-	if lastUpdated.Valid {
-		w.LastUpdatedAt = &lastUpdated.Time
+	if t, err := ParseTime(lastUpdatedVal); err == nil && !t.IsZero() {
+		w.LastUpdatedAt = &t
 	}
 
 	return w, nil
@@ -92,19 +92,19 @@ func ListWorkloads() ([]*Workload, error) {
 	var list []*Workload
 	for rows.Next() {
 		w := &Workload{}
-		var lastChecked, lastUpdated sql.NullTime
+		var lastCheckedVal, lastUpdatedVal interface{}
 		err := rows.Scan(
 			&w.ID, &w.Name, &w.NamespaceProject, &w.OrchestratorType, &w.CurrentImage, &w.CurrentDigest,
-			&w.NewImage, &w.NewDigest, &w.UpdateStatus, &lastChecked, &lastUpdated,
+			&w.NewImage, &w.NewDigest, &w.UpdateStatus, &lastCheckedVal, &lastUpdatedVal,
 		)
 		if err != nil {
 			return nil, err
 		}
-		if lastChecked.Valid {
-			w.LastCheckedAt = &lastChecked.Time
+		if t, err := ParseTime(lastCheckedVal); err == nil && !t.IsZero() {
+			w.LastCheckedAt = &t
 		}
-		if lastUpdated.Valid {
-			w.LastUpdatedAt = &lastUpdated.Time
+		if t, err := ParseTime(lastUpdatedVal); err == nil && !t.IsZero() {
+			w.LastUpdatedAt = &t
 		}
 		list = append(list, w)
 	}

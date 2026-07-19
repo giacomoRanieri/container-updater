@@ -3,6 +3,7 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -153,9 +154,9 @@ func HandleGetStats(w http.ResponseWriter, r *http.Request) {
 		SELECT COUNT(*), SUM(CASE WHEN update_status = 'update_available' THEN 1 ELSE 0 END), MAX(last_checked_at)
 		FROM workloads
 	`
-	var lastChecked sql.NullTime
+	var lastCheckedVal interface{}
 	var total, updates sql.NullInt64
-	err := db.DB.QueryRow(queryWorkloads).Scan(&total, &updates, &lastChecked)
+	err := db.DB.QueryRow(queryWorkloads).Scan(&total, &updates, &lastCheckedVal)
 	if err != nil {
 		logger.Log.Error("failed to calculate workload stats", "error", err)
 		http.Error(w, "Failed to fetch stats", http.StatusInternalServerError)
@@ -163,8 +164,19 @@ func HandleGetStats(w http.ResponseWriter, r *http.Request) {
 	}
 	stats.TotalWorkloads = int(total.Int64)
 	stats.UpdatesAvailable = int(updates.Int64)
-	if lastChecked.Valid {
-		stats.LastCheckAt = &lastChecked.Time
+	if lastCheckedVal != nil {
+		switch v := lastCheckedVal.(type) {
+		case time.Time:
+			stats.LastCheckAt = &v
+		case string:
+			if t, err := parseSQLiteTime(v); err == nil {
+				stats.LastCheckAt = &t
+			}
+		case []byte:
+			if t, err := parseSQLiteTime(string(v)); err == nil {
+				stats.LastCheckAt = &t
+			}
+		}
 	}
 
 	// 2. Get total successful updates
@@ -182,4 +194,24 @@ func HandleGetStats(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(stats)
+}
+
+func parseSQLiteTime(val string) (time.Time, error) {
+	if val == "" {
+		return time.Time{}, fmt.Errorf("empty time string")
+	}
+	formats := []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02 15:04:05.999999999-07:00",
+		"2006-01-02 15:04:05.999999999",
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05",
+	}
+	for _, f := range formats {
+		if t, err := time.Parse(f, val); err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("unable to parse sqlite time string: %s", val)
 }
