@@ -3,6 +3,12 @@ name: Cleanup PR Preview Docker Images
 on:
   pull_request:
     types: [closed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR Number to clean up (leave empty to clean up PRs 1-10)'
+        required: false
+        default: ''
 
 permissions:
   packages: write
@@ -19,57 +25,71 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const owner = context.repo.owner;
-            const prNumber = context.payload.pull_request.number;
             const packageNames = ['container-updater-backend', 'container-updater-frontend'];
-            const targetTags = [`pr-${prNumber}`, `pr-${prNumber}-amd64`, `pr-${prNumber}-arm64`];
+            let prNumbers = [];
 
-            for (const pkg of packageNames) {
-              console.log(`Checking package ${pkg} for tags matching PR ${prNumber}...`);
-              let versions = [];
-              try {
-                const res = await github.rest.packages.getAllPackageVersionsForUser({
-                  package_type: 'container',
-                  username: owner,
-                  package_name: pkg
-                });
-                versions = res.data;
-              } catch (err1) {
+            if (context.payload.inputs && context.payload.inputs.pr_number) {
+              prNumbers = [parseInt(context.payload.inputs.pr_number)];
+            } else if (context.payload.pull_request) {
+              prNumbers = [context.payload.pull_request.number];
+            } else {
+              // Manual cleanup for closed PRs 1-10
+              prNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+            }
+
+            console.log(`Targeting PR numbers: [${prNumbers.join(', ')}] for cleanup...`);
+
+            for (const prNum of prNumbers) {
+              const targetTags = [`pr-${prNum}`, `pr-${prNum}-amd64`, `pr-${prNum}-arm64`];
+
+              for (const pkg of packageNames) {
+                console.log(`Checking package ${pkg} for tags matching PR ${prNum}...`);
+                let versions = [];
                 try {
-                  const res = await github.rest.packages.getAllPackageVersionsForPackageOwnedByAuthenticatedUser({
+                  const res = await github.rest.packages.getAllPackageVersionsForUser({
                     package_type: 'container',
+                    username: owner,
                     package_name: pkg
                   });
                   versions = res.data;
-                } catch (err2) {
-                  console.log(`Could not list package versions for ${pkg}: ${err2.message}`);
-                  continue;
-                }
-              }
-
-              for (const ver of versions) {
-                const tags = ver.metadata?.container?.tags || [];
-                const matchedTags = tags.filter(t => targetTags.includes(t));
-
-                if (matchedTags.length > 0) {
-                  console.log(`Deleting package version ${ver.id} with tags [${matchedTags.join(', ')}]...`);
+                } catch (err1) {
                   try {
-                    await github.rest.packages.deletePackageVersionForUser({
+                    const res = await github.rest.packages.getAllPackageVersionsForPackageOwnedByAuthenticatedUser({
                       package_type: 'container',
-                      username: owner,
-                      package_name: pkg,
-                      package_version_id: ver.id
+                      package_name: pkg
                     });
-                    console.log(`Successfully deleted version ${ver.id}.`);
-                  } catch (delErr) {
+                    versions = res.data;
+                  } catch (err2) {
+                    console.log(`Could not list package versions for ${pkg}: ${err2.message}`);
+                    continue;
+                  }
+                }
+
+                for (const ver of versions) {
+                  const tags = ver.metadata?.container?.tags || [];
+                  const matchedTags = tags.filter(t => targetTags.includes(t));
+
+                  if (matchedTags.length > 0) {
+                    console.log(`Deleting package version ${ver.id} with tags [${matchedTags.join(', ')}]...`);
                     try {
-                      await github.rest.packages.deletePackageVersionForAuthenticatedUser({
+                      await github.rest.packages.deletePackageVersionForUser({
                         package_type: 'container',
+                        username: owner,
                         package_name: pkg,
                         package_version_id: ver.id
                       });
-                      console.log(`Successfully deleted version ${ver.id} via auth user endpoint.`);
-                    } catch (delErr2) {
-                      console.log(`Failed to delete version ${ver.id}: ${delErr2.message}`);
+                      console.log(`Successfully deleted version ${ver.id}.`);
+                    } catch (delErr) {
+                      try {
+                        await github.rest.packages.deletePackageVersionForAuthenticatedUser({
+                          package_type: 'container',
+                          package_name: pkg,
+                          package_version_id: ver.id
+                        });
+                        console.log(`Successfully deleted version ${ver.id} via auth user endpoint.`);
+                      } catch (delErr2) {
+                        console.log(`Failed to delete version ${ver.id}: ${delErr2.message}`);
+                      }
                     }
                   }
                 }
