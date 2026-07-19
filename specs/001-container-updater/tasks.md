@@ -22,9 +22,9 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Create project directories for `backend/` and `frontend/`
-- [ ] T002 Initialize Go modules in `backend/go.mod`
-- [ ] T003 [P] Initialize Next.js project using pnpm in `frontend/package.json`
+- [x] T001 Create project directories for `backend/` and `frontend/`
+- [x] T002 Initialize Go modules in `backend/go.mod`
+- [x] T003 [P] Initialize Next.js project using pnpm in `frontend/package.json`
 
 ---
 
@@ -34,10 +34,10 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Setup SQLite database initialization and schema creation in `backend/internal/db/db.go`
-- [ ] T005 Implement environment variables configuration in `backend/internal/config/config.go`
-- [ ] T006 Setup basic HTTP routing and middleware framework in `backend/internal/api/router.go`
-- [ ] T007 Configure structured logging and global error handling in `backend/internal/logger/logger.go`
+- [x] T004 Setup SQLite database initialization and schema creation in `backend/internal/db/db.go`
+- [x] T005 Implement environment variables configuration in `backend/internal/config/config.go`
+- [x] T006 Setup basic HTTP routing and middleware framework in `backend/internal/api/router.go`
+- [x] T007 Configure structured logging and global error handling in `backend/internal/logger/logger.go`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -51,14 +51,14 @@
 
 ### Implementation for User Story 1
 
-- [ ] T008 [P] [US1] Create Workload entity model and SQLite CRUD queries in `backend/internal/db/workload.go`
-- [ ] T009 [P] [US1] Create NotificationService entity model and SQLite CRUD queries in `backend/internal/db/notification.go`
-- [ ] T010 [US1] Implement Docker client wrapper to list active containers filtered by label in `backend/internal/docker/client.go`
-- [ ] T011 [US1] Implement Kubernetes client wrapper to list active workloads filtered by annotation in `backend/internal/k8s/client.go`
-- [ ] T012 [US1] Implement Apprise notification dispatcher client in `backend/internal/notify/apprise.go`
-- [ ] T013 [US1] Implement registry check and comparison logic (SHA digest lookup) with private registry auth support in `backend/internal/monitor/check.go`
-- [ ] T014 [US1] Implement GitHub repository metadata extraction and Changelog fetching in `backend/internal/notify/changelog.go`
-- [ ] T015 [US1] Implement cron scheduler to run background checks at intervals in `backend/internal/monitor/scheduler.go`
+- [x] T008 [P] [US1] Create Workload entity model and SQLite CRUD queries in `backend/internal/db/workload.go`
+- [x] T009 [P] [US1] Create NotificationService entity model and SQLite CRUD queries in `backend/internal/db/notification.go`
+- [x] T010 [US1] Implement Docker client wrapper to list active containers filtered by label in `backend/internal/docker/client.go`
+- [x] T011 [US1] Implement Kubernetes client wrapper to list active workloads filtered by annotation in `backend/internal/k8s/client.go`
+- [x] T012 [US1] Implement Apprise notification dispatcher client in `backend/internal/notify/apprise.go`
+- [x] T013 [US1] Implement registry check and comparison logic (SHA digest lookup) with private registry auth support in `backend/internal/monitor/check.go`
+- [x] T014 [US1] Implement GitHub repository metadata extraction and Changelog fetching in `backend/internal/notify/changelog.go`
+- [x] T015 [US1] Implement cron scheduler to run background checks at intervals in `backend/internal/monitor/scheduler.go`
 
 **Checkpoint**: At this point, User Story 1 is fully functional and testable independently.
 
@@ -72,15 +72,15 @@
 
 ### Implementation for User Story 2
 
-- [ ] T016 [US2] Implement OIDC OAuth2 login, callback, and session REST endpoints in `backend/internal/api/auth.go`
-- [ ] T017 [US2] Implement REST endpoints to list workloads, audit logs, and app stats in `backend/internal/api/workloads.go`
-- [ ] T018 [US2] Implement WebSocket server for real-time workload notifications in `backend/internal/api/websocket.go`
-- [ ] T019 [P] [US2] Implement OIDC authentication redirection and session client in `frontend/src/services/auth.ts`
-- [ ] T020 [P] [US2] Implement API service client to fetch workloads, audit logs, and handle WebSocket streams in `frontend/src/services/api.ts`
-- [ ] T021 [US2] Implement design tokens and CSS base layout (Vanilla CSS) in `frontend/src/styles/globals.css`
-- [ ] T022 [P] [US2] Create Dashboard workload list component in `frontend/src/components/Dashboard.tsx`
-- [ ] T023 [P] [US2] Create Audit Log / Job History list component in `frontend/src/components/AuditLog.tsx`
-- [ ] T024 [US2] Create login page and dashboard layout in `frontend/src/pages/index.tsx`
+- [x] T016 [US2] Implement OIDC OAuth2 login, callback, and session REST endpoints in `backend/internal/api/auth.go`
+- [x] T017 [US2] Implement REST endpoints to list workloads, audit logs, and app stats in `backend/internal/api/workloads.go`
+- [x] T018 [US2] Implement WebSocket server for real-time workload notifications in `backend/internal/api/websocket.go`
+- [x] T019 [P] [US2] Implement OIDC authentication redirection and session client in `frontend/src/services/auth.ts`
+- [x] T020 [P] [US2] Implement API service client to fetch workloads, audit logs, and handle WebSocket streams in `frontend/src/services/api.ts`
+- [x] T021 [US2] Implement design tokens and CSS base layout (Vanilla CSS) in `frontend/src/styles/globals.css`
+- [x] T022 [P] [US2] Create Dashboard workload list component in `frontend/src/components/Dashboard.tsx`
+- [x] T023 [P] [US2] Create Audit Log / Job History list component in `frontend/src/components/AuditLog.tsx`
+- [x] T024 [US2] Create login page and dashboard layout in `frontend/src/pages/index.tsx`
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently.
 
@@ -94,11 +94,11 @@
 
 ### Implementation for User Story 3
 
-- [ ] T025 [US3] Create UpdateJob entity model and SQLite queries in `backend/internal/db/job.go`
-- [ ] T026 [US3] Implement Compose YAML modification and shell execution of `docker compose up -d` in `backend/internal/docker/update.go`
-- [ ] T027 [US3] Implement Kubernetes YAML manifest modification and client-go application in `backend/internal/k8s/update.go`
-- [ ] T028 [US3] Implement REST endpoint to trigger manual workload update job in `backend/internal/api/jobs.go`
-- [ ] T029 [P] [US3] Add manual update trigger buttons to the dashboard component in `frontend/src/components/WorkloadItem.tsx`
+- [x] T025 [US3] Create UpdateJob entity model and SQLite queries in `backend/internal/db/job.go`
+- [x] T026 [US3] Implement Compose YAML modification and shell execution of `docker compose up -d` in `backend/internal/docker/update.go`
+- [x] T027 [US3] Implement Kubernetes YAML manifest modification and client-go application in `backend/internal/k8s/update.go`
+- [x] T028 [US3] Implement REST endpoint to trigger manual workload update job in `backend/internal/api/jobs.go`
+- [x] T029 [P] [US3] Add manual update trigger buttons to the dashboard component in `frontend/src/components/WorkloadItem.tsx`
 
 **Checkpoint**: All user stories should now be independently functional.
 
@@ -112,8 +112,8 @@
 
 ### Implementation for User Story 4
 
-- [ ] T030 [US4] Implement GitOps Git repository clone, commit, and push wrapper in `backend/internal/git/gitops.go`
-- [ ] T031 [P] [US4] Add Git authentication settings (SSH keys or token) in `backend/internal/config/config.go`
+- [x] T030 [US4] Implement GitOps Git repository clone, commit, and push wrapper in `backend/internal/git/gitops.go`
+- [x] T031 [P] [US4] Add Git authentication settings (SSH keys or token) in `backend/internal/config/config.go`
 
 ---
 
@@ -121,11 +121,11 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T032 [P] Add Apprise notification and Git settings page in `frontend/src/pages/settings.tsx`
-- [ ] T033 [P] Create multi-stage container deployment configurations in `Dockerfile.backend`, `Dockerfile.frontend`, and `docker-compose.yml`
-- [ ] T034 Update `README.md` with container build, volume mount, and deployment instructions
-- [ ] T035 Run end-to-end validation scenarios documented in `specs/001-container-updater/quickstart.md`
-- [ ] T036 [P] Create GitHub Actions matrix build workflow (amd64/arm64) and GHCR push without QEMU emulation in `.github/workflows/ci-cd.yml`
+- [x] T032 [P] Add Apprise notification and Git settings page in `frontend/src/pages/settings.tsx`
+- [x] T033 [P] Create multi-stage container deployment configurations in `Dockerfile.backend`, `Dockerfile.frontend`, and `docker-compose.yml`
+- [x] T034 Update `README.md` with container build, volume mount, and deployment instructions
+- [x] T035 Run end-to-end validation scenarios documented in `specs/001-container-updater/quickstart.md`
+- [x] T036 [P] Create GitHub Actions matrix build workflow (amd64/arm64) and GHCR push without QEMU emulation in `.github/workflows/ci-cd.yml`
 
 ---
 

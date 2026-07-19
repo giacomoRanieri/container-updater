@@ -1,0 +1,44 @@
+FROM node:20-alpine AS base
+
+# Install pnpm globally using corepack
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+FROM base AS deps
+WORKDIR /app
+
+# Copy pnpm workspace configurations and package definitions
+COPY frontend/package.json frontend/pnpm-lock.yaml* ./
+
+# Install packages
+RUN pnpm install
+
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY frontend/ ./
+
+# Disable next telemetry during build
+ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN pnpm build
+
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Copy build artifacts
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/next.config.ts* ./
+COPY --from=builder /app/next.config.js* ./
+
+EXPOSE 3000
+
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+CMD ["pnpm", "start"]

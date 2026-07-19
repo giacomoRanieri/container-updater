@@ -1,1 +1,6 @@
 .agents
+.gopath
+.gocache
+/gopath
+/gocache
+/home
