@@ -19,7 +19,7 @@ COPY backend/ ./
 RUN go mod tidy && CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/updater cmd/updater/main.go
 
 # Stage 2: Final lightweight runner
-FROM alpine:3.19
+FROM alpine:3.24
 
 WORKDIR /app
 
