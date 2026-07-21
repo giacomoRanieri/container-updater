@@ -64,4 +64,5 @@ All commit messages and PR titles **MUST** comply with the [Conventional Commits
 
 * **Temporary Preview Images**: Pull Requests build temporary preview Docker images on GHCR tagged `:pr-<number>` (e.g. `ghcr.io/giacomoranieri/container-updater-backend:pr-1`).
 * **Automated Cleanup**: These preview images exist **only while the PR is open**. As soon as the PR is closed or merged, an automated cleanup workflow (`.github/workflows/pr-cleanup.yml`) removes the temporary package tags from GHCR, ensuring zero artifact bloat.
-* **Environment Approval Gates**: Deployments use the GitHub Environment `beta-build`, requiring designated maintainer sign-off before publishing images.
+* **Environment Approval Gates**: Deployments use the GitHub Environment `beta-build`, requiring designated maintainer sign-off before publishing images. This approval gate applies to the publish steps that push beta or preview artifacts to GHCR.
+* **Concurrency Protection**: CI/CD runs use cancellation rules so that newer commits automatically abort older in-progress builds for the same branch or PR, preventing duplicate or stale artifact publication.
