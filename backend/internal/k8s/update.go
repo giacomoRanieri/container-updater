@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"container-updater/backend/internal/config"
+	"container-updater/backend/internal/git"
 	"container-updater/backend/internal/logger"
 
 	"gopkg.in/yaml.v3"
@@ -18,25 +19,34 @@ import (
 
 // UpdateK8sWorkload updates the manifest on disk, and optionally updates the cluster directly
 func UpdateK8sWorkload(ctx context.Context, namespace, workloadType, workloadName, containerName, newImage string) error {
-	// 1. Determine manifest directory
-	manifestsDir := os.Getenv("K8S_MANIFESTS_DIR")
-	if manifestsDir == "" {
-		manifestsDir = "/app/manifests"
+	// 1. Determine manifest directories to search
+	candidateDirs := []string{}
+	if manifestsDir := os.Getenv("K8S_MANIFESTS_DIR"); manifestsDir != "" {
+		candidateDirs = append(candidateDirs, manifestsDir)
 	}
-	
-	// If GitOps is enabled, use the cloned repo directory instead
+	if os.Getenv("K8S_WORKSPACE_DIR") != "" {
+		candidateDirs = append(candidateDirs, os.Getenv("K8S_WORKSPACE_DIR"))
+	}
+	if dir := os.Getenv("WORKSPACE_DIR"); dir != "" {
+		candidateDirs = append(candidateDirs, dir)
+	}
+	if len(candidateDirs) == 0 {
+		candidateDirs = []string{"/app/manifests", "/app/workspace"}
+	}
+
+	// If GitOps is enabled, use the cloned repo directory first
 	if config.GlobalConfig.GitOps.Enabled {
 		gitCloneDir := os.Getenv("GITOPS_CLONE_DIR")
 		if gitCloneDir == "" {
 			gitCloneDir = "/app/gitops"
 		}
-		manifestsDir = gitCloneDir
+		candidateDirs = append([]string{gitCloneDir}, candidateDirs...)
 	}
 
-	logger.Log.Info("searching for workload manifest file...", "dir", manifestsDir, "name", workloadName, "type", workloadType)
+	logger.Log.Info("searching for workload manifest file...", "dirs", candidateDirs, "name", workloadName, "type", workloadType)
 
-	// 2. Walk directory to find and edit the manifest
-	found, err := findAndEditManifest(manifestsDir, workloadType, workloadName, containerName, newImage)
+	// 2. Walk directories to find and edit the manifest
+	found, err := findAndEditManifestInRoots(candidateDirs, workloadType, workloadName, containerName, newImage)
 	if err != nil {
 		return fmt.Errorf("failed to search and edit manifest file: %w", err)
 	}
@@ -50,6 +60,11 @@ func UpdateK8sWorkload(ctx context.Context, namespace, workloadType, workloadNam
 	// 3. If GitOps is enabled, skip direct in-cluster update (GitOps controller will reconcile)
 	if config.GlobalConfig.GitOps.Enabled {
 		logger.Log.Info("GitOps enabled. Skipping direct in-cluster update. Changes must be committed and pushed to Git.")
+		if found {
+			if err := git.ProcessGitOpsCommit(ctx, workloadName, newImage); err != nil {
+				return fmt.Errorf("gitops sync failed: %w", err)
+			}
+		}
 		return nil
 	}
 
@@ -135,8 +150,28 @@ func UpdateK8sWorkload(ctx context.Context, namespace, workloadType, workloadNam
 	return nil
 }
 
-// findAndEditManifest recursively searches for a yaml file defining the workload,
+// findAndEditManifestInRoots recursively searches for a yaml file defining the workload,
 // updates the image path, and saves the file back.
+func findAndEditManifestInRoots(roots []string, workloadType, workloadName, containerName, newImage string) (bool, error) {
+	manifestFound := false
+
+	for _, root := range roots {
+		if root == "" {
+			continue
+		}
+		found, err := findAndEditManifest(root, workloadType, workloadName, containerName, newImage)
+		if err != nil {
+			return false, err
+		}
+		if found {
+			manifestFound = true
+			break
+		}
+	}
+
+	return manifestFound, nil
+}
+
 func findAndEditManifest(dir, workloadType, workloadName, containerName, newImage string) (bool, error) {
 	manifestFound := false
 	

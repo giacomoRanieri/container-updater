@@ -20,7 +20,7 @@ COPY frontend/ ./
 # Disable next telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN npm run build
+RUN pnpm build
 
 FROM base AS runner
 WORKDIR /app

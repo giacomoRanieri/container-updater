@@ -8,6 +8,10 @@ import (
 
 var Log *slog.Logger
 
+func init() {
+	Init("info")
+}
+
 func Init(level string) {
 	var slogLevel slog.Level
 	switch level {

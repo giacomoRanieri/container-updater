@@ -114,6 +114,24 @@ As a DevOps engineer or system administrator, I want `container-updater` to supp
 - **AC-6.6**: When `K8S_AUTO_APPLY=true`, `container-updater` automatically executes `kubectl apply -f <manifest>` after modifying the local Kubernetes YAML file on disk.
 - **AC-6.7**: For GitOps controllers (ArgoCD/FluxCD), `container-updater` supports pushing modified manifests to a Git repository OR dispatching an HTTP Sync Webhook (`K8S_SYNC_WEBHOOK_URL`).
 
+### User Story 7 - Registry Credential Management (Priority: P2)
+
+As a platform operator, I want to manage OCI registry credentials through the API and the Web UI, so I can authenticate to private registries and avoid anonymous rate limiting without editing the database directly.
+
+#### Acceptance Criteria
+- **AC-7.1**: The backend exposes CRUD endpoints under `/api/registries` to list, create, and delete registry credentials.
+- **AC-7.2**: Passwords and tokens are never returned in clear text from the list API; the UI receives masked values or placeholders.
+- **AC-7.3**: The Settings screen exposes a dedicated Registries tab where users can add and remove registry credentials.
+
+### User Story 8 - Workspace Manifest Synchronization (Priority: P2)
+
+As a GitOps operator, I want container updates to be persisted back to the workspace YAML manifests on disk, so the changes are available for review, commit, or deployment automation.
+
+#### Acceptance Criteria
+- **AC-8.1**: After a successful update, the corresponding Compose or Kubernetes manifest file in the mounted workspace is updated on disk with the new image tag or digest.
+- **AC-8.2**: When GitOps is enabled, the updated manifests are committed and pushed to the configured Git repository.
+- **AC-8.3**: The system searches the workspace directory (default `/app/workspace`) for the relevant manifest files when the runtime path is not directly available.
+
 ---
 
 ### Edge Cases
@@ -167,6 +185,8 @@ As a DevOps engineer or system administrator, I want `container-updater` to supp
 - **FR-038**: The monitor service MUST support Semantic Versioning (SemVer) and CalVer tag tracking (`registry.FindLatestMatchingTag`), listing remote registry tags via OCI v2 API (`GET /v2/<repo>/tags/list`) and detecting newer release version tags (e.g. `2026.6.4` -> `2026.6.5`) even when image tags are version-pinned.
 - **FR-039**: The OCI registry HTTP client MUST parse `Www-Authenticate` Bearer header parameters using an RFC 7235–compliant quoted-string-aware parser, ensuring the `scope` field is correctly extracted even when it contains colons or commas inside quoted values.
 - **FR-040**: The OCI registry HTTP client `ListTags` implementation MUST paginate through all registry tag pages by following RFC 5988 `Link: rel="next"` response headers until all tags are fetched, preventing missed newer tags for repositories with more than 100 releases.
+- **FR-041**: The system MUST expose protected REST endpoints under `/api/registries` for listing, creating, and deleting registry credentials used for OCI authentication.
+- **FR-042**: The system MUST persist successful workload image updates back to the relevant workspace YAML manifest files on disk and, when GitOps is enabled, commit and push the resulting changes to the configured Git repository.
 
 ### Key Entities *(include if feature involves data)*
 
