@@ -39,6 +39,14 @@ export interface NotificationService {
   created_at?: string;
 }
 
+export interface RegistryCredential {
+  id: string;
+  server_address: string;
+  username: string;
+  password: string;
+  created_at?: string;
+}
+
 // Fetch helper with standard headers and credentials
 async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const backendUrl = getBackendUrl();
@@ -84,6 +92,23 @@ export async function fetchStats(): Promise<AppStats> {
 
 export async function fetchNotifications(): Promise<NotificationService[]> {
   return apiRequest<NotificationService[]>("/api/notifications");
+}
+
+export async function fetchRegistries(): Promise<RegistryCredential[]> {
+  return apiRequest<RegistryCredential[]>("/api/registries");
+}
+
+export async function saveRegistry(credential: Omit<RegistryCredential, "id"> & { id?: string }): Promise<RegistryCredential> {
+  return apiRequest<RegistryCredential>("/api/registries", {
+    method: "POST",
+    body: JSON.stringify(credential),
+  });
+}
+
+export async function deleteRegistry(id: string): Promise<void> {
+  return apiRequest<void>(`/api/registries/${id}`, {
+    method: "DELETE",
+  });
 }
 
 export async function saveNotification(service: Omit<NotificationService, "id"> & { id?: string }): Promise<NotificationService> {

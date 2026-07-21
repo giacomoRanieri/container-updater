@@ -12,6 +12,7 @@ import (
 	"container-updater/backend/internal/logger"
 	"container-updater/backend/internal/monitor"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
@@ -63,6 +64,93 @@ func HandleListNotifications(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(services)
+}
+
+type RegistryCredentialInput struct {
+	ID            string `json:"id,omitempty"`
+	ServerAddress string `json:"server_address"`
+	Username      string `json:"username"`
+	Password      string `json:"password"`
+}
+
+func HandleListRegistries(w http.ResponseWriter, r *http.Request) {
+	items, err := db.ListRegistryCredentials()
+	if err != nil {
+		logger.Log.Error("failed to list registry credentials", "error", err)
+		http.Error(w, "Failed to retrieve registry credentials", http.StatusInternalServerError)
+		return
+	}
+
+	masked := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		masked = append(masked, map[string]any{
+			"id":             item.ID,
+			"server_address": item.ServerAddress,
+			"username":       item.Username,
+			"password":       db.MaskRegistryPassword(item.Password),
+			"created_at":     item.CreatedAt,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(masked)
+}
+
+func HandleSaveRegistry(w http.ResponseWriter, r *http.Request) {
+	var input RegistryCredentialInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if input.ServerAddress == "" || input.Username == "" || input.Password == "" {
+		http.Error(w, "server_address, username and password are required", http.StatusBadRequest)
+		return
+	}
+
+	id := input.ID
+	if id == "" {
+		id = "registry-" + uuid.New().String()[:8]
+	}
+
+	credential := &db.RegistryCredential{
+		ID:            id,
+		ServerAddress: input.ServerAddress,
+		Username:      input.Username,
+		Password:      input.Password,
+		CreatedAt:     time.Now(),
+	}
+
+	if err := db.SaveRegistryCredential(credential); err != nil {
+		logger.Log.Error("failed to save registry credential", "id", id, "error", err)
+		http.Error(w, "Failed to save registry credential", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]any{
+		"id":             credential.ID,
+		"server_address": credential.ServerAddress,
+		"username":       credential.Username,
+		"password":       db.MaskRegistryPassword(credential.Password),
+		"created_at":     credential.CreatedAt,
+	})
+}
+
+func HandleDeleteRegistry(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		http.Error(w, "Missing registry ID parameter", http.StatusBadRequest)
+		return
+	}
+
+	if err := db.DeleteRegistryCredential(id); err != nil {
+		logger.Log.Error("failed to delete registry credential", "id", id, "error", err)
+		http.Error(w, "Failed to delete registry credential", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 type SaveNotificationInput struct {

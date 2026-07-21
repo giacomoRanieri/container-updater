@@ -5,12 +5,18 @@ import {
   fetchNotifications,
   saveNotification,
   NotificationService,
+  fetchRegistries,
+  saveRegistry,
+  deleteRegistry,
+  RegistryCredential,
 } from "../services/api";
 
 export default function Settings() {
   const [notifications, setNotifications] = useState<NotificationService[]>([]);
-  const [activeTab, setActiveTab] = useState<"notifications" | "system">("notifications");
+  const [registries, setRegistries] = useState<RegistryCredential[]>([]);
+  const [activeTab, setActiveTab] = useState<"notifications" | "registries" | "system">("notifications");
   const [isLoading, setIsLoading] = useState(false);
+  const [isRegistrySaving, setIsRegistrySaving] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // New notification service form state
@@ -20,6 +26,10 @@ export default function Settings() {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  const [registryServer, setRegistryServer] = useState("");
+  const [registryUsername, setRegistryUsername] = useState("");
+  const [registryPassword, setRegistryPassword] = useState("");
 
   // Load notification settings
   const loadSettings = async () => {
@@ -38,6 +48,22 @@ export default function Settings() {
   useEffect(() => {
     loadSettings();
   }, []);
+
+  const loadRegistries = async () => {
+    try {
+      const list = await fetchRegistries();
+      setRegistries(list);
+    } catch (err) {
+      console.error("Failed to load registry credentials", err);
+      showMsg("Failed to retrieve registry credentials", "error");
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "registries") {
+      loadRegistries();
+    }
+  }, [activeTab]);
 
   const showMsg = (text: string, type: "success" | "error") => {
     setMessage({ text, type });
@@ -97,6 +123,44 @@ export default function Settings() {
     setFormEnabled(true);
   };
 
+  const handleRegistrySave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!registryServer || !registryUsername || !registryPassword) {
+      showMsg("Server address, username, and password are required", "error");
+      return;
+    }
+
+    setIsRegistrySaving(true);
+    try {
+      await saveRegistry({
+        server_address: registryServer,
+        username: registryUsername,
+        password: registryPassword,
+      });
+      showMsg("Registry credentials saved successfully", "success");
+      setRegistryServer("");
+      setRegistryUsername("");
+      setRegistryPassword("");
+      loadRegistries();
+    } catch (err) {
+      console.error("Failed to save registry credential", err);
+      showMsg("Failed to save registry credential", "error");
+    } finally {
+      setIsRegistrySaving(false);
+    }
+  };
+
+  const handleDeleteRegistry = async (id: string) => {
+    try {
+      await deleteRegistry(id);
+      showMsg("Registry credential deleted", "success");
+      loadRegistries();
+    } catch (err) {
+      console.error("Failed to delete registry credential", err);
+      showMsg("Failed to delete registry credential", "error");
+    }
+  };
+
   return (
     <div className="app-container">
       <Head>
@@ -151,6 +215,24 @@ export default function Settings() {
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"></path>
             </svg>
             Apprise Notifications
+          </button>
+          <button
+            className="btn nav-link"
+            style={{
+              justifyContent: "flex-start",
+              width: "100%",
+              background: activeTab === "registries" ? "rgba(255,255,255,0.05)" : "transparent",
+              color: activeTab === "registries" ? "var(--text-primary)" : "var(--text-secondary)",
+              padding: "0.75rem 1rem",
+              borderRadius: "8px",
+            }}
+            onClick={() => setActiveTab("registries")}
+          >
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ marginRight: "0.5rem" }}>
+              <rect x="3" y="4" width="18" height="16" rx="3"></rect>
+              <path d="M7 8h10M7 12h10M7 16h6"></path>
+            </svg>
+            Registries
           </button>
           <button
             className="btn nav-link"
@@ -323,6 +405,47 @@ export default function Settings() {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          ) : activeTab === "registries" ? (
+            <div className="glass-card" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              <div>
+                <h2 style={{ fontSize: "1.2rem", marginBottom: "0.5rem" }}>Registry Credentials</h2>
+                <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                  Store credentials for Docker Hub, GHCR, and private registries used by OCI checks.
+                </p>
+              </div>
+
+              <form onSubmit={handleRegistrySave} style={{ display: "grid", gap: "1rem" }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>Server Address</label>
+                  <input type="text" className="form-control" placeholder="docker.io" value={registryServer} onChange={(e) => setRegistryServer(e.target.value)} />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>Username</label>
+                  <input type="text" className="form-control" placeholder="my-user" value={registryUsername} onChange={(e) => setRegistryUsername(e.target.value)} />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>Password / Access Token</label>
+                  <input type="password" className="form-control" placeholder="••••••••" value={registryPassword} onChange={(e) => setRegistryPassword(e.target.value)} />
+                </div>
+                <button type="submit" className="btn btn-primary" disabled={isRegistrySaving}>
+                  {isRegistrySaving ? "Saving..." : "Save Registry Credential"}
+                </button>
+              </form>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {registries.length === 0 ? (
+                  <div style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>No registry credentials configured yet.</div>
+                ) : registries.map((registry) => (
+                  <div key={registry.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.9rem", background: "rgba(255,255,255,0.02)", borderRadius: "8px" }}>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{registry.server_address}</div>
+                      <div style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>{registry.username} • password: {registry.password}</div>
+                    </div>
+                    <button className="btn btn-secondary" onClick={() => handleDeleteRegistry(registry.id)}>Delete</button>
+                  </div>
+                ))}
               </div>
             </div>
           ) : (

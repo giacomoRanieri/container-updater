@@ -65,6 +65,11 @@ func NewRouter() http.Handler {
 		r.Get("/api/audit-logs", HandleListAuditLogs)
 		r.Get("/api/stats", HandleGetStats)
 
+		// Registries
+		r.Get("/api/registries", HandleListRegistries)
+		r.Post("/api/registries", HandleSaveRegistry)
+		r.Delete("/api/registries/{id}", HandleDeleteRegistry)
+
 		// Notifications
 		r.Get("/api/notifications", HandleListNotifications)
 		r.Post("/api/notifications", HandleSaveNotification)
