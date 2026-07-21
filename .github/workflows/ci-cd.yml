@@ -78,7 +78,6 @@ jobs:
   build-matrix:
     name: Build Native Image (${{ matrix.arch }})
     needs: determine-tags
-    environment: beta-build
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
