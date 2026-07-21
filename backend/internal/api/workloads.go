@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 
 	"container-updater/backend/internal/db"
 	"container-updater/backend/internal/logger"
+	"container-updater/backend/internal/monitor"
 
 	"github.com/google/uuid"
 )
@@ -214,4 +216,20 @@ func parseSQLiteTime(val string) (time.Time, error) {
 		}
 	}
 	return time.Time{}, fmt.Errorf("unable to parse sqlite time string: %s", val)
+}
+
+func HandleTriggerScan(w http.ResponseWriter, r *http.Request) {
+	logger.Log.Info("Manual scan triggered via API endpoint")
+	if monitor.GlobalScheduler != nil {
+		go monitor.GlobalScheduler.RunCheck(context.Background())
+	} else {
+		logger.Log.Warn("GlobalScheduler is nil, manual scan run skipped")
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "scan_started",
+		"message": "Manual workload check sequence initiated.",
+	})
 }

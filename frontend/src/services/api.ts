@@ -99,6 +99,12 @@ export async function triggerWorkloadUpdate(id: string): Promise<{ job_id: strin
   });
 }
 
+export async function triggerManualScan(): Promise<{ status: string; message: string }> {
+  return apiRequest<{ status: string; message: string }>("/api/scan", {
+    method: "POST",
+  });
+}
+
 // WebSocket real-time subscription
 export function connectWebSocket(
   onEvent: (event: string, data: any) => void,

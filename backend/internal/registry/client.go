@@ -118,6 +118,112 @@ func (c *Client) fetchDigestViaGet(ctx context.Context, manifestURL, username, p
 	return strings.TrimPrefix(digest, "sha256:"), nil
 }
 
+// ListTags queries the OCI Registry v2 API for all tags, following
+// RFC 5988 Link headers for pagination (registries return at most 100 per page).
+func (c *Client) ListTags(ctx context.Context, imageRef, username, password string) ([]string, error) {
+	host, repo, _ := parseImageRef(imageRef)
+	nextURL := fmt.Sprintf("https://%s/v2/%s/tags/list", host, repo)
+
+	// Obtain a bearer token once via the first 401 challenge
+	var bearerToken string
+
+	var allTags []string
+	for nextURL != "" {
+		tags, next, token, err := c.fetchTagPage(ctx, nextURL, host, username, password, bearerToken)
+		if err != nil {
+			return nil, err
+		}
+		if token != "" {
+			bearerToken = token // reuse for subsequent pages
+		}
+		allTags = append(allTags, tags...)
+		nextURL = next
+	}
+	return allTags, nil
+}
+
+// fetchTagPage fetches a single page of tags and returns (tags, nextURL, bearerToken, error).
+// nextURL is non-empty when the registry signals more pages via a Link header.
+// bearerToken is returned (non-empty) only on the first page when auth is negotiated.
+func (c *Client) fetchTagPage(ctx context.Context, pageURL, host, username, password, bearerToken string) ([]string, string, string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
+	if err != nil {
+		return nil, "", "", err
+	}
+	if bearerToken != "" {
+		req.Header.Set("Authorization", "Bearer "+bearerToken)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, "", "", fmt.Errorf("failed HTTP request to list tags from %s: %w", host, err)
+	}
+	defer resp.Body.Close()
+
+	// Handle auth challenge on the first page
+	if resp.StatusCode == http.StatusUnauthorized && bearerToken == "" {
+		authHeader := resp.Header.Get("Www-Authenticate")
+		token, err := c.obtainToken(ctx, authHeader, username, password)
+		if err != nil {
+			return nil, "", "", fmt.Errorf("registry auth failed for %s: %w", host, err)
+		}
+		bearerToken = token
+
+		req, err = http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
+		if err != nil {
+			return nil, "", "", err
+		}
+		req.Header.Set("Authorization", "Bearer "+bearerToken)
+
+		resp, err = c.httpClient.Do(req)
+		if err != nil {
+			return nil, "", "", fmt.Errorf("failed authenticated tag list request to %s: %w", host, err)
+		}
+		defer resp.Body.Close()
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, "", "", fmt.Errorf("registry returned HTTP %d for %s", resp.StatusCode, pageURL)
+	}
+
+	var tagResp struct {
+		Name string   `json:"name"`
+		Tags []string `json:"tags"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&tagResp); err != nil {
+		return nil, "", "", err
+	}
+
+	// Parse RFC 5988 Link header for the next page URL
+	// Example: Link: </v2/repo/tags/list?last=tag100&n=100>; rel="next"
+	nextURL := parseLinkNext(resp.Header.Get("Link"), host)
+
+	return tagResp.Tags, nextURL, bearerToken, nil
+}
+
+// parseLinkNext extracts the absolute URL from a RFC 5988 Link header with rel="next".
+func parseLinkNext(linkHeader, host string) string {
+	if linkHeader == "" {
+		return ""
+	}
+	// Header format: </v2/repo/tags/list?last=...&n=100>; rel="next"
+	parts := strings.Split(linkHeader, ";")
+	if len(parts) < 2 {
+		return ""
+	}
+	rel := strings.TrimSpace(parts[1])
+	if !strings.Contains(rel, `rel="next"`) {
+		return ""
+	}
+	urlPart := strings.TrimSpace(parts[0])
+	urlPart = strings.Trim(urlPart, "<>")
+	if strings.HasPrefix(urlPart, "/") {
+		return "https://" + host + urlPart
+	}
+	return urlPart
+}
+
+
 func setManifestHeaders(req *http.Request) {
 	req.Header.Set("Accept", strings.Join([]string{
 		"application/vnd.docker.distribution.manifest.v2+json",
@@ -193,18 +299,34 @@ func (c *Client) obtainToken(ctx context.Context, wwwAuthHeader, username, passw
 	return "", fmt.Errorf("empty token received")
 }
 
+// parseHeaderParams parses a Bearer Www-Authenticate parameter string
+// respecting RFC 7235 quoted strings (commas inside quotes are not delimiters).
 func parseHeaderParams(header string) map[string]string {
 	result := make(map[string]string)
-	parts := strings.Split(header, ",")
-	for _, p := range parts {
-		kv := strings.SplitN(strings.TrimSpace(p), "=", 2)
-		if len(kv) == 2 {
-			key := strings.TrimSpace(kv[0])
-			val := strings.Trim(strings.TrimSpace(kv[1]), "\"")
-			result[key] = val
+	inQuote := false
+	start := 0
+	for i := 0; i < len(header); i++ {
+		switch header[i] {
+		case '"':
+			inQuote = !inQuote
+		case ',':
+			if !inQuote {
+				parseHeaderKV(result, strings.TrimSpace(header[start:i]))
+				start = i + 1
+			}
 		}
 	}
+	parseHeaderKV(result, strings.TrimSpace(header[start:]))
 	return result
+}
+
+func parseHeaderKV(m map[string]string, s string) {
+	kv := strings.SplitN(s, "=", 2)
+	if len(kv) == 2 {
+		key := strings.TrimSpace(kv[0])
+		val := strings.Trim(strings.TrimSpace(kv[1]), "\"")
+		m[key] = val
+	}
 }
 
 func parseImageRef(imageRef string) (host, repo, tag string) {

@@ -15,6 +15,8 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
+var GlobalScheduler *MonitorScheduler
+
 type MonitorScheduler struct {
 	cron         *cron.Cron
 	dockerClient *docker.DockerClient
@@ -32,11 +34,13 @@ func NewMonitorScheduler() (*MonitorScheduler, error) {
 		logger.Log.Warn("Kubernetes client initialization skipped or failed", "error", err)
 	}
 
-	return &MonitorScheduler{
+	s := &MonitorScheduler{
 		cron:         cron.New(),
 		dockerClient: dClient,
 		k8sClient:    kClient,
-	}, nil
+	}
+	GlobalScheduler = s
+	return s, nil
 }
 
 func (s *MonitorScheduler) Start(ctx context.Context) error {

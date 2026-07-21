@@ -6,6 +6,7 @@ import {
   fetchAuditLogs,
   fetchStats,
   triggerWorkloadUpdate,
+  triggerManualScan,
   connectWebSocket,
   Workload,
   AuditLogItem,
@@ -117,21 +118,10 @@ export default function Home() {
   const handleManualCheck = async () => {
     setIsScanning(true);
     try {
-      // Hit backend API config to run a check
-      // For US1 check, we can define a check endpoint or let the backend start checking
-      // Let's call refresh after a short delay since checking runs concurrently
-      // We will also fetch new workloads list
-      const res = await fetch("http://localhost:8080/api/workloads", {
-        method: "GET",
-        headers: { "Accept": "application/json" },
-        credentials: "include",
-      });
-      if (res.ok) {
-        const list = await res.json();
-        setWorkloads(list);
-        const stats = await fetchStats();
-        setStats(stats);
-      }
+      await triggerManualScan();
+      setTimeout(() => {
+        refreshAllData();
+      }, 1500);
     } catch (err) {
       console.error("Failed to run manual check:", err);
     } finally {

@@ -162,6 +162,11 @@ As a DevOps engineer or system administrator, I want `container-updater` to supp
 - **FR-033**: The database layer MUST scan aggregate SQL query timestamp results (e.g. `MAX(last_checked_at)`) safely as generic interface types or strings and parse them using multi-format timestamp parsers (`parseSQLiteTime`), preventing SQLite type scan mismatches during stats calculation (`/api/stats`).
 - **FR-034**: The monitor scheduler MUST execute remote registry digest inspection (`CheckWorkloadUpdate`) for all scanned workloads (including Kubernetes workloads) regardless of whether the local Docker daemon client socket is connected or available.
 - **FR-035**: The system MUST implement a native HTTP/HTTPS OCI Registry v2 client (`registry.Client`) to query remote image digests directly over HTTP without requiring a running Docker Engine daemon or socket.
+- **FR-036**: The Web UI workload card component MUST render status badges (`UP TO DATE`, `UPDATE AVAILABLE`) using responsive flexbox positioning without absolute overlapping, enforce text truncation on long names, and format Kubernetes workload names concisely (`formatWorkloadName`).
+- **FR-037**: The system MUST expose a protected `POST /api/scan` API endpoint allowing users to trigger an immediate, on-demand background registry update check across all monitored workloads without waiting for the scheduled cron interval.
+- **FR-038**: The monitor service MUST support Semantic Versioning (SemVer) and CalVer tag tracking (`registry.FindLatestMatchingTag`), listing remote registry tags via OCI v2 API (`GET /v2/<repo>/tags/list`) and detecting newer release version tags (e.g. `2026.6.4` -> `2026.6.5`) even when image tags are version-pinned.
+- **FR-039**: The OCI registry HTTP client MUST parse `Www-Authenticate` Bearer header parameters using an RFC 7235–compliant quoted-string-aware parser, ensuring the `scope` field is correctly extracted even when it contains colons or commas inside quoted values.
+- **FR-040**: The OCI registry HTTP client `ListTags` implementation MUST paginate through all registry tag pages by following RFC 5988 `Link: rel="next"` response headers until all tags are fetched, preventing missed newer tags for repositories with more than 100 releases.
 
 ### Key Entities *(include if feature involves data)*
 
