@@ -197,15 +197,6 @@ func findAndEditManifest(dir, workloadType, workloadName, containerName, newImag
 			return err
 		}
 
-<<<<<<< feat/k8s-async-rollout-monitoring-ws-events
-		// Decode all documents in multi-document YAML file
-		decoder := yaml.NewDecoder(bytes.NewReader(data))
-		var docs []map[string]any
-
-		for {
-			var doc map[string]any
-			if err := decoder.Decode(&doc); err != nil {
-=======
 		// Detect original indentation (2 vs 4 spaces)
 		indent := detectYAMLIndentation(data)
 
@@ -216,36 +207,20 @@ func findAndEditManifest(dir, workloadType, workloadName, containerName, newImag
 		for {
 			var node yaml.Node
 			if err := decoder.Decode(&node); err != nil {
->>>>>>> local
 				if errors.Is(err, io.EOF) {
 					break
 				}
 				break
 			}
-<<<<<<< feat/k8s-async-rollout-monitoring-ws-events
-			if doc != nil {
-				docs = append(docs, doc)
-			}
-		}
-
-		if len(docs) == 0 {
-=======
 			docNodes = append(docNodes, &node)
 		}
 
 		if len(docNodes) == 0 {
->>>>>>> local
 			return nil
 		}
 
 		updatedInFile := false
 
-<<<<<<< feat/k8s-async-rollout-monitoring-ws-events
-		for _, doc := range docs {
-			kind, _ := doc["kind"].(string)
-			metadata, _ := doc["metadata"].(map[string]any)
-			if metadata == nil {
-=======
 		for _, docNode := range docNodes {
 			if docNode.Kind != yaml.DocumentNode || len(docNode.Content) == 0 {
 				continue
@@ -264,67 +239,9 @@ func findAndEditManifest(dir, workloadType, workloadName, containerName, newImag
 
 			nameNode := findChildMapNode(metadataNode, "name")
 			if nameNode == nil {
->>>>>>> local
 				continue
 			}
-			name, _ := metadata["name"].(string)
 
-			// Compare kind and name
-			if strings.EqualFold(kind, workloadType) && strings.EqualFold(name, workloadName) {
-				logger.Log.Info("found matching manifest YAML file", "path", path)
-
-<<<<<<< feat/k8s-async-rollout-monitoring-ws-events
-				spec, _ := doc["spec"].(map[string]any)
-				if spec == nil {
-					continue
-				}
-				template, _ := spec["template"].(map[string]any)
-				if template == nil {
-					continue
-				}
-				templateSpec, _ := template["spec"].(map[string]any)
-				if templateSpec == nil {
-					continue
-				}
-				containers, _ := templateSpec["containers"].([]any)
-				if containers == nil {
-					continue
-				}
-
-				// Update container image
-				updatedContainer := false
-				for i, cItem := range containers {
-					cMap, ok := cItem.(map[string]any)
-					if !ok {
-						continue
-					}
-					cName, _ := cMap["name"].(string)
-					if strings.EqualFold(cName, containerName) {
-						cMap["image"] = newImage
-						containers[i] = cMap
-						updatedContainer = true
-						break
-					}
-				}
-
-				if updatedContainer {
-					templateSpec["containers"] = containers
-					template["spec"] = templateSpec
-					spec["template"] = template
-					doc["spec"] = spec
-					updatedInFile = true
-				}
-			}
-		}
-
-		if updatedInFile {
-			var buf bytes.Buffer
-			encoder := yaml.NewEncoder(&buf)
-			encoder.SetIndent(2)
-
-			for _, doc := range docs {
-				if err := encoder.Encode(doc); err != nil {
-=======
 			// Compare kind and name
 			if strings.EqualFold(kindNode.Value, workloadType) && strings.EqualFold(nameNode.Value, workloadName) {
 				logger.Log.Info("found matching manifest YAML file", "path", path)
@@ -359,7 +276,6 @@ func findAndEditManifest(dir, workloadType, workloadName, containerName, newImag
 
 			for _, docNode := range docNodes {
 				if err := encoder.Encode(docNode); err != nil {
->>>>>>> local
 					return err
 				}
 			}
