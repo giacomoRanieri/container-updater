@@ -188,6 +188,12 @@ As a GitOps operator, I want container updates to be persisted back to the works
 - **FR-041**: The system MUST expose protected REST endpoints under `/api/registries` for listing, creating, and deleting registry credentials used for OCI authentication.
 - **FR-042**: The system MUST persist successful workload image updates back to the relevant workspace YAML manifest files on disk and, when GitOps is enabled, commit and push the resulting changes to the configured Git repository.
 - **FR-043**: The system MUST construct and parse Kubernetes workload IDs using an unambiguous colon-delimited format (`k8s:{namespace}:{type}:{workloadName}:{containerName}`) while supporting legacy hyphen-delimited format fallbacks, preventing parsing errors when workload or container names contain hyphens.
+<<<<<<< feat/k8s-async-rollout-monitoring-ws-events
+- **FR-044**: The system MUST monitor Kubernetes workload rollout status asynchronously using a Kubernetes Client Watcher (`k8s.WatchRollout`), tracking replica readiness and pod failure states (`ImagePullBackOff`, `CrashLoopBackOff`), and keeping the update job in `in_progress` until rollout succeeds or times out.
+- **FR-045**: The system MUST stream live Kubernetes rollout progress (`job_status` with `percent_complete` and replica counts) and pod status events (`pod_event` with pod phase) over WebSockets (`/api/ws`) to render real-time progress bars and status indicators in the Web UI.
+=======
+- **FR-046**: The manifest updater (`findAndEditManifest`) MUST decode all YAML documents in multi-document manifest files using a stream decoder (`yaml.NewDecoder`), modifying only target workload resources and preserving all other resource documents (`Service`, `Ingress`, `ConfigMap`) when re-encoding.
+>>>>>>> local
 
 ### Key Entities *(include if feature involves data)*
 

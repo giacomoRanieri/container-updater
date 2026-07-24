@@ -1,9 +1,11 @@
 package k8s
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -174,12 +176,12 @@ func findAndEditManifestInRoots(roots []string, workloadType, workloadName, cont
 
 func findAndEditManifest(dir, workloadType, workloadName, containerName, newImage string) (bool, error) {
 	manifestFound := false
-	
+
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		
+
 		if d.IsDir() {
 			return nil
 		}
@@ -195,76 +197,96 @@ func findAndEditManifest(dir, workloadType, workloadName, containerName, newImag
 			return err
 		}
 
-		// Unmarshal to verify if this document contains our workload
-		var doc map[string]any
-		if err := yaml.Unmarshal(data, &doc); err != nil {
-			// Skip unparseable YAML documents (could be multi-document or invalid)
-			return nil
-		}
+		// Detect original indentation (2 vs 4 spaces)
+		indent := detectYAMLIndentation(data)
 
-		kind, _ := doc["kind"].(string)
-		metadata, _ := doc["metadata"].(map[string]any)
-		if metadata == nil {
-			return nil
-		}
-		name, _ := metadata["name"].(string)
+		// Decode all documents in multi-document YAML file into yaml.Node ASTs
+		decoder := yaml.NewDecoder(bytes.NewReader(data))
+		var docNodes []*yaml.Node
 
-		// Compare kind and name
-		if strings.ToLower(kind) == strings.ToLower(workloadType) && strings.ToLower(name) == strings.ToLower(workloadName) {
-			logger.Log.Info("found matching manifest YAML file", "path", path)
-			
-			spec, _ := doc["spec"].(map[string]any)
-			if spec == nil {
-				return nil
-			}
-			template, _ := spec["template"].(map[string]any)
-			if template == nil {
-				return nil
-			}
-			templateSpec, _ := template["spec"].(map[string]any)
-			if templateSpec == nil {
-				return nil
-			}
-			containers, _ := templateSpec["containers"].([]any)
-			if containers == nil {
-				return nil
-			}
-
-			// Update container image
-			updated := false
-			for i, cItem := range containers {
-				cMap, ok := cItem.(map[string]any)
-				if !ok {
-					continue
-				}
-				cName, _ := cMap["name"].(string)
-				if strings.ToLower(cName) == strings.ToLower(containerName) {
-					cMap["image"] = newImage
-					containers[i] = cMap
-					updated = true
+		for {
+			var node yaml.Node
+			if err := decoder.Decode(&node); err != nil {
+				if errors.Is(err, io.EOF) {
 					break
 				}
+				break
+			}
+			docNodes = append(docNodes, &node)
+		}
+
+		if len(docNodes) == 0 {
+			return nil
+		}
+
+		updatedInFile := false
+
+		for _, docNode := range docNodes {
+			if docNode.Kind != yaml.DocumentNode || len(docNode.Content) == 0 {
+				continue
 			}
 
-			if updated {
-				templateSpec["containers"] = containers
-				template["spec"] = templateSpec
-				spec["template"] = template
-				doc["spec"] = spec
-
-				// Write back updated YAML structure
-				outBytes, err := yaml.Marshal(doc)
-				if err != nil {
-					return err
-				}
-
-				if err := os.WriteFile(path, outBytes, 0644); err != nil {
-					return err
-				}
-
-				manifestFound = true
-				return filepath.SkipDir // Stop walking since we found and edited
+			root := docNode.Content[0]
+			if root.Kind != yaml.MappingNode {
+				continue
 			}
+
+			kindNode := findChildMapNode(root, "kind")
+			metadataNode := findChildMapNode(root, "metadata")
+			if kindNode == nil || metadataNode == nil {
+				continue
+			}
+
+			nameNode := findChildMapNode(metadataNode, "name")
+			if nameNode == nil {
+				continue
+			}
+
+			// Compare kind and name
+			if strings.EqualFold(kindNode.Value, workloadType) && strings.EqualFold(nameNode.Value, workloadName) {
+				logger.Log.Info("found matching manifest YAML file", "path", path)
+
+				specNode := findChildMapNode(root, "spec")
+				templateNode := findChildMapNode(specNode, "template")
+				templateSpecNode := findChildMapNode(templateNode, "spec")
+				containersNode := findChildMapNode(templateSpecNode, "containers")
+
+				if containersNode != nil && containersNode.Kind == yaml.SequenceNode {
+					for _, cNode := range containersNode.Content {
+						if cNode.Kind != yaml.MappingNode {
+							continue
+						}
+
+						cNameNode := findChildMapNode(cNode, "name")
+						if cNameNode != nil && strings.EqualFold(cNameNode.Value, containerName) {
+							// Update image scalar node value in-place to preserve AST style, comments, and structure
+							setChildMapValue(cNode, "image", newImage)
+							updatedInFile = true
+							break
+						}
+					}
+				}
+			}
+		}
+
+		if updatedInFile {
+			var buf bytes.Buffer
+			encoder := yaml.NewEncoder(&buf)
+			encoder.SetIndent(indent)
+
+			for _, docNode := range docNodes {
+				if err := encoder.Encode(docNode); err != nil {
+					return err
+				}
+			}
+			encoder.Close()
+
+			if err := os.WriteFile(path, buf.Bytes(), 0644); err != nil {
+				return err
+			}
+
+			manifestFound = true
+			return filepath.SkipDir // Stop walking since we found and edited
 		}
 
 		return nil
@@ -275,4 +297,53 @@ func findAndEditManifest(dir, workloadType, workloadName, containerName, newImag
 	}
 
 	return manifestFound, nil
+}
+
+// findChildMapNode returns the value node for a key in a MappingNode
+func findChildMapNode(node *yaml.Node, key string) *yaml.Node {
+	if node == nil || node.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i < len(node.Content)-1; i += 2 {
+		if strings.EqualFold(node.Content[i].Value, key) {
+			return node.Content[i+1]
+		}
+	}
+	return nil
+}
+
+// setChildMapValue sets or updates the value node for a key in a MappingNode
+func setChildMapValue(node *yaml.Node, key, value string) {
+	if node == nil || node.Kind != yaml.MappingNode {
+		return
+	}
+	for i := 0; i < len(node.Content)-1; i += 2 {
+		if strings.EqualFold(node.Content[i].Value, key) {
+			node.Content[i+1].Value = value
+			node.Content[i+1].Tag = "!!str"
+			return
+		}
+	}
+	// If key not present, append key-value pair
+	keyNode := &yaml.Node{Kind: yaml.ScalarNode, Value: key, Tag: "!!str"}
+	valNode := &yaml.Node{Kind: yaml.ScalarNode, Value: value, Tag: "!!str"}
+	node.Content = append(node.Content, keyNode, valNode)
+}
+
+// detectYAMLIndentation inspects lines of a YAML file to determine its indent (2 or 4 spaces)
+func detectYAMLIndentation(data []byte) int {
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimLeft(line, " ")
+		indent := len(line) - len(trimmed)
+		if indent > 0 && !strings.HasPrefix(trimmed, "#") && !strings.HasPrefix(trimmed, "-") {
+			if indent == 4 {
+				return 4
+			}
+			if indent == 2 {
+				return 2
+			}
+		}
+	}
+	return 2
 }

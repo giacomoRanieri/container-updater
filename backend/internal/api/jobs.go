@@ -151,6 +151,38 @@ func executeUpdateAsync(jobID string, w *db.Workload) {
 					updateErr = fmt.Errorf("GitOps sync failed: %w", gitOpsErr)
 				}
 			}
+
+			// 3. Monitor async rollout status using k8s Client Watcher & stream WebSocket events
+			if updateErr == nil {
+				BroadcastEvent("job_status", map[string]any{
+					"job_id":           jobID,
+					"workload_id":      w.ID,
+					"status":           "in_progress",
+					"percent_complete": 50,
+					"message":          "Waiting for Kubernetes rollout to complete...",
+				})
+
+				rolloutErr := k8s.WatchRollout(ctx, namespace, wType, wName, k8s.GetRolloutTimeout(), func(percent int, msg string, podStatus string) {
+					BroadcastEvent("job_status", map[string]any{
+						"job_id":           jobID,
+						"workload_id":      w.ID,
+						"status":           "in_progress",
+						"percent_complete": percent,
+						"message":          msg,
+					})
+					BroadcastEvent("pod_event", map[string]any{
+						"workload_id": w.ID,
+						"pod_name":    wName,
+						"status":      podStatus,
+						"message":     msg,
+					})
+				})
+
+				if rolloutErr != nil {
+					logger.Log.Error("Kubernetes rollout failed or timed out", "workload", wName, "error", rolloutErr)
+					updateErr = rolloutErr
+				}
+			}
 		}
 	} else {
 		updateErr = fmt.Errorf("unsupported orchestrator type: %s", w.OrchestratorType)
