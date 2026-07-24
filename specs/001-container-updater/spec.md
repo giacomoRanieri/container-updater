@@ -187,6 +187,7 @@ As a GitOps operator, I want container updates to be persisted back to the works
 - **FR-040**: The OCI registry HTTP client `ListTags` implementation MUST paginate through all registry tag pages by following RFC 5988 `Link: rel="next"` response headers until all tags are fetched, preventing missed newer tags for repositories with more than 100 releases.
 - **FR-041**: The system MUST expose protected REST endpoints under `/api/registries` for listing, creating, and deleting registry credentials used for OCI authentication.
 - **FR-042**: The system MUST persist successful workload image updates back to the relevant workspace YAML manifest files on disk and, when GitOps is enabled, commit and push the resulting changes to the configured Git repository.
+- **FR-043**: The system MUST construct and parse Kubernetes workload IDs using an unambiguous colon-delimited format (`k8s:{namespace}:{type}:{workloadName}:{containerName}`) while supporting legacy hyphen-delimited format fallbacks, preventing parsing errors when workload or container names contain hyphens.
 
 ### Key Entities *(include if feature involves data)*
 

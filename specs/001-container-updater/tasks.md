@@ -169,6 +169,7 @@
 - [x] T056 Implement SemVer / CalVer tag tracking (`FindLatestMatchingTag`) in `backend/internal/registry/semver.go` (Issue #19)
 - [x] T057 Fix RFC 7235 quoted-string `parseHeaderParams` bug in `backend/internal/registry/client.go` breaking `Www-Authenticate` scope parsing on Docker Hub / GHCR (Issue #20)
 - [x] T058 Implement RFC 5988 `Link` header pagination in `ListTags` in `backend/internal/registry/client.go` to fetch all tags for repos with 100+ releases (Issue #21)
+- [x] T059 Fix Kubernetes workload ID format (`k8s:{namespace}:{type}:{workloadName}:{containerName}`) and parser in `backend/internal/api/jobs.go` and `backend/internal/k8s/client.go` to prevent misparsing hyphenated names (Issue #26)
 
 ---
 
