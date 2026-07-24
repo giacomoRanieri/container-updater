@@ -216,6 +216,31 @@ func executeUpdateAsync(jobID string, w *db.Workload) {
 }
 
 func parseK8sWorkloadID(id string) (string, string, string, string, error) {
+	// 1. Colon format: k8s:{namespace}:{type}:{workloadName}:{containerName}
+	if strings.HasPrefix(id, "k8s:") {
+		parts := strings.Split(id, ":")
+		if len(parts) == 5 {
+			namespace := parts[1]
+			rawType := parts[2]
+			wName := parts[3]
+			cName := parts[4]
+
+			var wType string
+			switch rawType {
+			case "deploy", "deployment", "Deployment":
+				wType = "Deployment"
+			case "sts", "statefulset", "StatefulSet":
+				wType = "StatefulSet"
+			case "ds", "daemonset", "DaemonSet":
+				wType = "DaemonSet"
+			default:
+				return "", "", "", "", fmt.Errorf("unknown workload orchestrator type in ID: %s", id)
+			}
+			return namespace, wType, wName, cName, nil
+		}
+	}
+
+	// 2. Legacy hyphen format: k8s-{namespace}-{indicator}-{workloadName}-{containerName}
 	if !strings.HasPrefix(id, "k8s-") {
 		return "", "", "", "", fmt.Errorf("invalid kubernetes workload ID format: %s", id)
 	}
@@ -243,7 +268,17 @@ func parseK8sWorkloadID(id string) (string, string, string, string, error) {
 	namespace := parts[0]
 	rest := parts[1]
 
-	// Find the last hyphen separating workloadName and containerName
+	// Handle case where workloadName and containerName are identical (e.g. matter-server-matter-server)
+	if len(rest)%2 == 1 {
+		mid := len(rest) / 2
+		if rest[mid] == '-' && rest[:mid] == rest[mid+1:] {
+			wName := rest[:mid]
+			cName := rest[mid+1:]
+			return namespace, wType, wName, cName, nil
+		}
+	}
+
+	// Fallback to last hyphen splitting
 	lastIdx := strings.LastIndex(rest, "-")
 	if lastIdx == -1 {
 		return "", "", "", "", fmt.Errorf("failed to parse workload name and container name from: %s", rest)

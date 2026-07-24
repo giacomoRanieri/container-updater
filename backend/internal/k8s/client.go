@@ -62,7 +62,7 @@ func (k *K8sClient) ListMonitoredWorkloads(ctx context.Context) ([]*db.Workload,
 			for _, container := range dep.Spec.Template.Spec.Containers {
 				digest := k.getRunningDigest(ctx, dep.Namespace, "Deployment", dep.Name, container.Name)
 				workloads = append(workloads, &db.Workload{
-					ID:               fmt.Sprintf("k8s-%s-deploy-%s-%s", dep.Namespace, dep.Name, container.Name),
+					ID:               fmt.Sprintf("k8s:%s:deploy:%s:%s", dep.Namespace, dep.Name, container.Name),
 					Name:             formatWorkloadName(dep.Name, container.Name),
 					NamespaceProject: dep.Namespace,
 					OrchestratorType: "kubernetes",
@@ -87,7 +87,7 @@ func (k *K8sClient) ListMonitoredWorkloads(ctx context.Context) ([]*db.Workload,
 			for _, container := range sts.Spec.Template.Spec.Containers {
 				digest := k.getRunningDigest(ctx, sts.Namespace, "StatefulSet", sts.Name, container.Name)
 				workloads = append(workloads, &db.Workload{
-					ID:               fmt.Sprintf("k8s-%s-sts-%s-%s", sts.Namespace, sts.Name, container.Name),
+					ID:               fmt.Sprintf("k8s:%s:sts:%s:%s", sts.Namespace, sts.Name, container.Name),
 					Name:             formatWorkloadName(sts.Name, container.Name),
 					NamespaceProject: sts.Namespace,
 					OrchestratorType: "kubernetes",
@@ -112,7 +112,7 @@ func (k *K8sClient) ListMonitoredWorkloads(ctx context.Context) ([]*db.Workload,
 			for _, container := range ds.Spec.Template.Spec.Containers {
 				digest := k.getRunningDigest(ctx, ds.Namespace, "DaemonSet", ds.Name, container.Name)
 				workloads = append(workloads, &db.Workload{
-					ID:               fmt.Sprintf("k8s-%s-ds-%s-%s", ds.Namespace, ds.Name, container.Name),
+					ID:               fmt.Sprintf("k8s:%s:ds:%s:%s", ds.Namespace, ds.Name, container.Name),
 					Name:             formatWorkloadName(ds.Name, container.Name),
 					NamespaceProject: ds.Namespace,
 					OrchestratorType: "kubernetes",
