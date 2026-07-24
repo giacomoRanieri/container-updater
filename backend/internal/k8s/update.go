@@ -1,9 +1,11 @@
 package k8s
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -174,12 +176,12 @@ func findAndEditManifestInRoots(roots []string, workloadType, workloadName, cont
 
 func findAndEditManifest(dir, workloadType, workloadName, containerName, newImage string) (bool, error) {
 	manifestFound := false
-	
+
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		
+
 		if d.IsDir() {
 			return nil
 		}
@@ -195,76 +197,102 @@ func findAndEditManifest(dir, workloadType, workloadName, containerName, newImag
 			return err
 		}
 
-		// Unmarshal to verify if this document contains our workload
-		var doc map[string]any
-		if err := yaml.Unmarshal(data, &doc); err != nil {
-			// Skip unparseable YAML documents (could be multi-document or invalid)
-			return nil
-		}
+		// Decode all documents in multi-document YAML file
+		decoder := yaml.NewDecoder(bytes.NewReader(data))
+		var docs []map[string]any
 
-		kind, _ := doc["kind"].(string)
-		metadata, _ := doc["metadata"].(map[string]any)
-		if metadata == nil {
-			return nil
-		}
-		name, _ := metadata["name"].(string)
-
-		// Compare kind and name
-		if strings.ToLower(kind) == strings.ToLower(workloadType) && strings.ToLower(name) == strings.ToLower(workloadName) {
-			logger.Log.Info("found matching manifest YAML file", "path", path)
-			
-			spec, _ := doc["spec"].(map[string]any)
-			if spec == nil {
-				return nil
-			}
-			template, _ := spec["template"].(map[string]any)
-			if template == nil {
-				return nil
-			}
-			templateSpec, _ := template["spec"].(map[string]any)
-			if templateSpec == nil {
-				return nil
-			}
-			containers, _ := templateSpec["containers"].([]any)
-			if containers == nil {
-				return nil
-			}
-
-			// Update container image
-			updated := false
-			for i, cItem := range containers {
-				cMap, ok := cItem.(map[string]any)
-				if !ok {
-					continue
-				}
-				cName, _ := cMap["name"].(string)
-				if strings.ToLower(cName) == strings.ToLower(containerName) {
-					cMap["image"] = newImage
-					containers[i] = cMap
-					updated = true
+		for {
+			var doc map[string]any
+			if err := decoder.Decode(&doc); err != nil {
+				if errors.Is(err, io.EOF) {
 					break
 				}
+				break
 			}
+			if doc != nil {
+				docs = append(docs, doc)
+			}
+		}
 
-			if updated {
-				templateSpec["containers"] = containers
-				template["spec"] = templateSpec
-				spec["template"] = template
-				doc["spec"] = spec
+		if len(docs) == 0 {
+			return nil
+		}
 
-				// Write back updated YAML structure
-				outBytes, err := yaml.Marshal(doc)
-				if err != nil {
-					return err
+		updatedInFile := false
+
+		for _, doc := range docs {
+			kind, _ := doc["kind"].(string)
+			metadata, _ := doc["metadata"].(map[string]any)
+			if metadata == nil {
+				continue
+			}
+			name, _ := metadata["name"].(string)
+
+			// Compare kind and name
+			if strings.EqualFold(kind, workloadType) && strings.EqualFold(name, workloadName) {
+				logger.Log.Info("found matching manifest YAML file", "path", path)
+
+				spec, _ := doc["spec"].(map[string]any)
+				if spec == nil {
+					continue
+				}
+				template, _ := spec["template"].(map[string]any)
+				if template == nil {
+					continue
+				}
+				templateSpec, _ := template["spec"].(map[string]any)
+				if templateSpec == nil {
+					continue
+				}
+				containers, _ := templateSpec["containers"].([]any)
+				if containers == nil {
+					continue
 				}
 
-				if err := os.WriteFile(path, outBytes, 0644); err != nil {
-					return err
+				// Update container image
+				updatedContainer := false
+				for i, cItem := range containers {
+					cMap, ok := cItem.(map[string]any)
+					if !ok {
+						continue
+					}
+					cName, _ := cMap["name"].(string)
+					if strings.EqualFold(cName, containerName) {
+						cMap["image"] = newImage
+						containers[i] = cMap
+						updatedContainer = true
+						break
+					}
 				}
 
-				manifestFound = true
-				return filepath.SkipDir // Stop walking since we found and edited
+				if updatedContainer {
+					templateSpec["containers"] = containers
+					template["spec"] = templateSpec
+					spec["template"] = template
+					doc["spec"] = spec
+					updatedInFile = true
+				}
 			}
+		}
+
+		if updatedInFile {
+			var buf bytes.Buffer
+			encoder := yaml.NewEncoder(&buf)
+			encoder.SetIndent(2)
+
+			for _, doc := range docs {
+				if err := encoder.Encode(doc); err != nil {
+					return err
+				}
+			}
+			encoder.Close()
+
+			if err := os.WriteFile(path, buf.Bytes(), 0644); err != nil {
+				return err
+			}
+
+			manifestFound = true
+			return filepath.SkipDir // Stop walking since we found and edited
 		}
 
 		return nil
