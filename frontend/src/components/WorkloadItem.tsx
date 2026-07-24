@@ -4,9 +4,16 @@ import { Workload } from "../services/api";
 interface WorkloadItemProps {
   workload: Workload;
   onTriggerUpdate: (id: string) => void;
+  progress?: {
+    percent?: number;
+    message?: string;
+    podStatus?: string;
+  };
 }
 
-export default function WorkloadItem({ workload, onTriggerUpdate }: WorkloadItemProps) {
+export default function WorkloadItem({ workload, onTriggerUpdate, progress }: WorkloadItemProps) {
+  const isUpdating = workload.update_status === "updating";
+
   return (
     <div
       className="glass-card workload-card"
@@ -152,6 +159,32 @@ export default function WorkloadItem({ workload, onTriggerUpdate }: WorkloadItem
               </div>
             </div>
           )}
+
+          {isUpdating && (
+            <div style={{ marginTop: "0.5rem", borderTop: "1px dashed var(--glass-border)", paddingTop: "0.5rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "#38bdf8", marginBottom: "0.35rem" }}>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginRight: "0.5rem" }}>
+                  {progress?.message || "Rolling out update..."}
+                </span>
+                {progress?.podStatus && (
+                  <span style={{ fontWeight: 600, fontFamily: "monospace", color: "#a78bfa" }}>
+                    [{progress.podStatus}]
+                  </span>
+                )}
+              </div>
+              <div style={{ width: "100%", background: "rgba(255, 255, 255, 0.1)", borderRadius: "4px", height: "6px", overflow: "hidden" }}>
+                <div
+                  style={{
+                    width: `${progress?.percent || 40}%`,
+                    background: "linear-gradient(90deg, #38bdf8, #818cf8)",
+                    height: "100%",
+                    borderRadius: "4px",
+                    transition: "width 0.4s ease",
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -193,8 +226,8 @@ export default function WorkloadItem({ workload, onTriggerUpdate }: WorkloadItem
               </svg>
               Execute Update
             </button>
-          ) : workload.update_status === "updating" ? (
-            <button className="btn btn-secondary" disabled style={{ width: "100%", padding: "0.5rem" }}>
+          ) : isUpdating ? (
+            <button className="btn btn-secondary" disabled style={{ width: "100%", padding: "0.5rem", color: "#38bdf8" }}>
               <svg
                 className="spin"
                 width="16"
@@ -207,7 +240,7 @@ export default function WorkloadItem({ workload, onTriggerUpdate }: WorkloadItem
               >
                 <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l.73-2.19"></path>
               </svg>
-              Updating...
+              {progress?.percent ? `Updating (${progress.percent}%)` : "Updating..."}
             </button>
           ) : (
             <button

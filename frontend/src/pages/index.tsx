@@ -74,6 +74,8 @@ export default function Home() {
     }
   }, [isAuthenticated, refreshAllData]);
 
+  const [jobProgress, setJobProgress] = useState<Record<string, { percent?: number; message?: string; podStatus?: string }>>({});
+
   // Connect WebSocket for real-time updates
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -87,9 +89,36 @@ export default function Home() {
         // Refresh stats
         fetchStats().then(setStats).catch(console.error);
       } else if (event === "job_status") {
+        if (data.workload_id) {
+          setJobProgress((prev) => ({
+            ...prev,
+            [data.workload_id]: {
+              percent: data.percent_complete,
+              message: data.message,
+            },
+          }));
+        }
         // If a job completes or fails, refresh audit logs and workloads
         if (data.status === "completed" || data.status === "failed" || data.status === "rolled_back") {
+          if (data.workload_id) {
+            setJobProgress((prev) => {
+              const copy = { ...prev };
+              delete copy[data.workload_id];
+              return copy;
+            });
+          }
           refreshAllData();
+        }
+      } else if (event === "pod_event") {
+        if (data.workload_id) {
+          setJobProgress((prev) => ({
+            ...prev,
+            [data.workload_id]: {
+              ...prev[data.workload_id],
+              podStatus: data.status,
+              message: data.message || prev[data.workload_id]?.message,
+            },
+          }));
         }
       }
     });
@@ -289,6 +318,7 @@ export default function Home() {
             onTriggerUpdate={handleTriggerUpdate}
             isChecking={isScanning}
             onManualCheck={handleManualCheck}
+            jobProgress={jobProgress}
           />
         ) : (
           <AuditLog

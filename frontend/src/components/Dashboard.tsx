@@ -7,6 +7,7 @@ interface DashboardProps {
   onTriggerUpdate: (id: string) => void;
   isChecking: boolean;
   onManualCheck: () => void;
+  jobProgress?: Record<string, { percent?: number; message?: string; podStatus?: string }>;
 }
 
 export default function Dashboard({
@@ -14,6 +15,7 @@ export default function Dashboard({
   onTriggerUpdate,
   isChecking,
   onManualCheck,
+  jobProgress = {},
 }: DashboardProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [orchestratorFilter, setOrchestratorFilter] = useState<string>("all");
@@ -133,7 +135,12 @@ export default function Dashboard({
       ) : (
         <div className="workload-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: "1.5rem" }}>
           {filteredWorkloads.map((w) => (
-            <WorkloadItem key={w.id} workload={w} onTriggerUpdate={onTriggerUpdate} />
+            <WorkloadItem
+              key={w.id}
+              workload={w}
+              onTriggerUpdate={onTriggerUpdate}
+              progress={jobProgress[w.id]}
+            />
           ))}
         </div>
       )}
