@@ -195,7 +195,7 @@ export default function Settings() {
       {/* Navigation Header */}
       <header className="navbar">
         <div className="navbar-content">
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.75rem", textDecoration: "none", color: "inherit" }}>
             <div style={{ background: "var(--accent-gradient)", width: "32px", height: "32px", borderRadius: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "white" }}>
               <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                 <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
@@ -204,7 +204,7 @@ export default function Settings() {
             <span style={{ fontSize: "1.2rem", fontWeight: "600" }}>
               Container <span className="text-gradient">Updater</span>
             </span>
-          </div>
+          </Link>
 
           <div className="nav-links">
             <Link href="/" className="nav-link">
@@ -219,67 +219,46 @@ export default function Settings() {
       </header>
 
       {/* Settings Main Layout */}
-      <main className="main-content" style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: "2rem", alignItems: "start" }}>
+      <main className="main-content settings-layout">
         
         {/* Settings Sidebar Tabs */}
-        <aside className="glass-card" style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+        <aside className="glass-card settings-sidebar">
           <button
-            className="btn nav-link"
-            style={{
-              justifyContent: "flex-start",
-              width: "100%",
-              background: activeTab === "notifications" ? "rgba(255,255,255,0.05)" : "transparent",
-              color: activeTab === "notifications" ? "var(--text-primary)" : "var(--text-secondary)",
-              padding: "0.75rem 1rem",
-              borderRadius: "8px",
-            }}
+            type="button"
+            className={`settings-nav-btn${activeTab === "notifications" ? " active" : ""}`}
             onClick={() => setActiveTab("notifications")}
           >
-            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ marginRight: "0.5rem" }}>
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"></path>
             </svg>
-            Apprise Notifications
+            <span>Apprise Notifications</span>
           </button>
           <button
-            className="btn nav-link"
-            style={{
-              justifyContent: "flex-start",
-              width: "100%",
-              background: activeTab === "registries" ? "rgba(255,255,255,0.05)" : "transparent",
-              color: activeTab === "registries" ? "var(--text-primary)" : "var(--text-secondary)",
-              padding: "0.75rem 1rem",
-              borderRadius: "8px",
-            }}
+            type="button"
+            className={`settings-nav-btn${activeTab === "registries" ? " active" : ""}`}
             onClick={() => setActiveTab("registries")}
           >
-            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ marginRight: "0.5rem" }}>
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <rect x="3" y="4" width="18" height="16" rx="3"></rect>
               <path d="M7 8h10M7 12h10M7 16h6"></path>
             </svg>
-            Registries
+            <span>Registries</span>
           </button>
           <button
-            className="btn nav-link"
-            style={{
-              justifyContent: "flex-start",
-              width: "100%",
-              background: activeTab === "system" ? "rgba(255,255,255,0.05)" : "transparent",
-              color: activeTab === "system" ? "var(--text-primary)" : "var(--text-secondary)",
-              padding: "0.75rem 1rem",
-              borderRadius: "8px",
-            }}
+            type="button"
+            className={`settings-nav-btn${activeTab === "system" ? " active" : ""}`}
             onClick={() => setActiveTab("system")}
           >
-            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ marginRight: "0.5rem" }}>
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
               <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37zM17.5 6.5h.01"></path>
             </svg>
-            GitOps & System Status
+            <span>GitOps &amp; System Status</span>
           </button>
         </aside>
 
         {/* Settings Tab Content */}
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+        <section className="settings-content">
           
           {message && (
             <div
@@ -298,17 +277,26 @@ export default function Settings() {
           )}
 
           {activeTab === "notifications" ? (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", alignItems: "start" }}>
+            <div className="settings-split-grid">
               {/* Form card */}
-              <div className="glass-card">
-                <h2 style={{ fontSize: "1.2rem", marginBottom: "1.25rem" }}>
-                  {editingId ? "Modify Notification Endpoint" : "Add Notification Endpoint"}
-                </h2>
+              <div className={`glass-card settings-form-card${editingId ? " is-editing" : ""}`}>
+                <div className="settings-card-header">
+                  <div>
+                    <h2 className="settings-card-title">
+                      {editingId ? "Modify Notification Endpoint" : "Add Notification Endpoint"}
+                    </h2>
+                    <p className="settings-card-subtitle">
+                      Send rollout and update alerts through Apprise-compatible endpoints.
+                    </p>
+                  </div>
+                  {editingId && <span className="settings-editing-badge">Editing</span>}
+                </div>
                 
                 <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label>Configuration Name</label>
+                    <label htmlFor="notification-name">Configuration Name</label>
                     <input
+                      id="notification-name"
                       type="text"
                       className="form-control"
                       placeholder="e.g. Admin Telegram Chat"
@@ -318,16 +306,17 @@ export default function Settings() {
                   </div>
 
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label>Apprise Connection URL</label>
+                    <label htmlFor="notification-url">Apprise Connection URL</label>
                     <input
+                      id="notification-url"
                       type="text"
                       className="form-control"
                       placeholder="tgram://botToken/chatID"
                       value={formUrl}
                       onChange={(e) => setFormUrl(e.target.value)}
                     />
-                    <small style={{ color: "var(--text-muted)", fontSize: "0.78rem", marginTop: "0.3rem", display: "block" }}>
-                      Apprise format examples: `tgram://bottoken/chatid` or `pushed://appkey`
+                    <small className="form-hint">
+                      Apprise format examples: <code className="inline-code">tgram://bottoken/chatid</code> or <code className="inline-code">pushed://appkey</code>
                     </small>
                   </div>
 
@@ -346,15 +335,16 @@ export default function Settings() {
                       type="submit"
                       className="btn btn-primary"
                       disabled={isSaving}
-                      style={{ flexGrow: 1 }}
+                      style={{ flexGrow: 1, whiteSpace: "nowrap" }}
                     >
-                      {isSaving ? "Saving..." : "Save Configuration"}
+                      {isSaving ? "Saving..." : editingId ? "Update Configuration" : "Save Configuration"}
                     </button>
                     {editingId && (
                       <button
                         type="button"
                         className="btn btn-secondary"
                         onClick={handleCancelEdit}
+                        style={{ whiteSpace: "nowrap" }}
                       >
                         Cancel
                       </button>
@@ -364,8 +354,18 @@ export default function Settings() {
               </div>
 
               {/* Endpoints List card */}
-              <div className="glass-card" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                <h2 style={{ fontSize: "1.2rem" }}>Configured Channels</h2>
+              <div className="glass-card">
+                <div className="settings-card-header">
+                  <div>
+                    <h2 className="settings-card-title">Configured Channels</h2>
+                    <p className="settings-card-subtitle">
+                      Active and paused endpoints notified during scans and updates.
+                    </p>
+                  </div>
+                  <span className="settings-count-badge">
+                    {notifications.length} {notifications.length === 1 ? "channel" : "channels"}
+                  </span>
+                </div>
 
                 {isLoading ? (
                   <div style={{ padding: "2rem", textAlign: "center" }}>
@@ -374,57 +374,38 @@ export default function Settings() {
                     </svg>
                   </div>
                 ) : notifications.length === 0 ? (
-                  <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                  <div className="settings-empty-state">
                     No notification channels registered.
                   </div>
                 ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                  <div className="settings-list">
                     {notifications.map((n) => (
                       <div
                         key={n.id}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          padding: "0.85rem",
-                          background: "rgba(255,255,255,0.02)",
-                          borderRadius: "8px",
-                          border: "1px solid var(--glass-border)",
-                        }}
+                        className={`settings-list-item${editingId === n.id ? " is-editing" : ""}`}
                       >
-                        <div style={{ overflow: "hidden", paddingRight: "1rem" }}>
-                          <h4 style={{ fontSize: "0.95rem", margin: 0, display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                            {n.name}
-                            <span
-                              style={{
-                                width: "6px",
-                                height: "6px",
-                                borderRadius: "50%",
-                                background: n.is_enabled ? "var(--color-success)" : "var(--color-error)",
-                              }}
-                            />
-                          </h4>
-                          <p
-                            style={{
-                              fontFamily: "monospace",
-                              fontSize: "0.75rem",
-                              color: "var(--text-muted)",
-                              margin: "0.2rem 0 0 0",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
+                        <div className="settings-item-body">
+                          <div className="settings-item-title-row">
+                            <h4 className="settings-item-title" title={n.name}>
+                              {n.name}
+                            </h4>
+                            <span className={`channel-status-pill ${n.is_enabled ? "is-enabled" : "is-disabled"}`}>
+                              {n.is_enabled ? "Enabled" : "Disabled"}
+                            </span>
+                          </div>
+                          <code className="settings-item-url" title={n.apprise_url}>
                             {n.apprise_url}
-                          </p>
+                          </code>
                         </div>
-                        <button
-                          className="btn btn-secondary"
-                          style={{ padding: "0.35rem 0.65rem", fontSize: "0.82rem" }}
-                          onClick={() => handleEdit(n)}
-                        >
-                          Modify
-                        </button>
+                        <div className="settings-item-actions">
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => handleEdit(n)}
+                          >
+                            {editingId === n.id ? "Editing" : "Modify"}
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -432,83 +413,147 @@ export default function Settings() {
               </div>
             </div>
           ) : activeTab === "registries" ? (
-            <div className="glass-card" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-              <div>
-                <h2 style={{ fontSize: "1.2rem", marginBottom: "0.5rem" }}>Registry Credentials</h2>
-                <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
-                  Store credentials for Docker Hub, GHCR, and private registries used by OCI checks.
-                </p>
+            <div className="settings-split-grid">
+              <div className="glass-card">
+                <div className="settings-card-header">
+                  <div>
+                    <h2 className="settings-card-title">Add Registry Credential</h2>
+                    <p className="settings-card-subtitle">
+                      Store credentials for Docker Hub, GHCR, and private registries used by OCI checks.
+                    </p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleRegistrySave} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label htmlFor="registry-server">Server Address</label>
+                    <input
+                      id="registry-server"
+                      type="text"
+                      className="form-control"
+                      placeholder="docker.io"
+                      value={registryServer}
+                      onChange={(e) => setRegistryServer(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label htmlFor="registry-username">Username</label>
+                    <input
+                      id="registry-username"
+                      type="text"
+                      className="form-control"
+                      placeholder="my-user"
+                      value={registryUsername}
+                      onChange={(e) => setRegistryUsername(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label htmlFor="registry-password">Password / Access Token</label>
+                    <input
+                      id="registry-password"
+                      type="password"
+                      className="form-control"
+                      placeholder="••••••••"
+                      value={registryPassword}
+                      onChange={(e) => setRegistryPassword(e.target.value)}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={isRegistrySaving}
+                    style={{ width: "100%", marginTop: "0.5rem", whiteSpace: "nowrap" }}
+                  >
+                    {isRegistrySaving ? "Saving..." : "Save Registry Credential"}
+                  </button>
+                </form>
               </div>
 
-              <form onSubmit={handleRegistrySave} style={{ display: "grid", gap: "1rem" }}>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label>Server Address</label>
-                  <input type="text" className="form-control" placeholder="docker.io" value={registryServer} onChange={(e) => setRegistryServer(e.target.value)} />
-                </div>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label>Username</label>
-                  <input type="text" className="form-control" placeholder="my-user" value={registryUsername} onChange={(e) => setRegistryUsername(e.target.value)} />
-                </div>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label>Password / Access Token</label>
-                  <input type="password" className="form-control" placeholder="••••••••" value={registryPassword} onChange={(e) => setRegistryPassword(e.target.value)} />
-                </div>
-                <button type="submit" className="btn btn-primary" disabled={isRegistrySaving}>
-                  {isRegistrySaving ? "Saving..." : "Save Registry Credential"}
-                </button>
-              </form>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                {registries.length === 0 ? (
-                  <div style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>No registry credentials configured yet.</div>
-                ) : registries.map((registry) => (
-                  <div key={registry.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.9rem", background: "rgba(255,255,255,0.02)", borderRadius: "8px" }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{registry.server_address}</div>
-                      <div style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>{registry.username} • password: {registry.password}</div>
-                    </div>
-                    <button className="btn btn-secondary" onClick={() => handleDeleteRegistry(registry.id)}>Delete</button>
+              <div className="glass-card">
+                <div className="settings-card-header">
+                  <div>
+                    <h2 className="settings-card-title">Configured Registries</h2>
+                    <p className="settings-card-subtitle">
+                      Credentials applied automatically when polling private images.
+                    </p>
                   </div>
-                ))}
+                  <span className="settings-count-badge">
+                    {registries.length} {registries.length === 1 ? "registry" : "registries"}
+                  </span>
+                </div>
+
+                {registries.length === 0 ? (
+                  <div className="settings-empty-state">
+                    No registry credentials configured yet.
+                  </div>
+                ) : (
+                  <div className="settings-list">
+                    {registries.map((registry) => (
+                      <div key={registry.id} className="settings-list-item">
+                        <div className="settings-item-body">
+                          <h4 className="settings-item-title" title={registry.server_address}>
+                            {registry.server_address}
+                          </h4>
+                          <div className="settings-item-meta" title={`${registry.username} • ${registry.password}`}>
+                            {registry.username} &bull; {registry.password}
+                          </div>
+                        </div>
+                        <div className="settings-item-actions">
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => handleDeleteRegistry(registry.id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ) : (
-            <div className="glass-card" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-              <div>
-                <h2 style={{ fontSize: "1.2rem", marginBottom: "0.5rem" }}>GitOps Git Integration</h2>
-                <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
-                  Settings are loaded from the backend host environment variables.
-                </p>
+            <div className="glass-card">
+              <div className="settings-card-header">
+                <div>
+                  <h2 className="settings-card-title">GitOps Git Integration</h2>
+                  <p className="settings-card-subtitle">
+                    Settings are loaded from the backend host environment variables.
+                  </p>
+                </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", fontSize: "0.9rem" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--glass-border)", paddingBottom: "0.5rem" }}>
+              <div className="settings-status-grid">
+                <div className="settings-kv-list">
+                  <div className="settings-kv-row">
                     <span style={{ color: "var(--text-secondary)" }}>Status:</span>
-                    <span style={{ fontWeight: "600", color: "var(--color-success)" }}>Active (Operational)</span>
+                    <span className="settings-kv-value" style={{ fontWeight: "600", color: "var(--color-success)" }}>
+                      Active (Operational)
+                    </span>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--glass-border)", paddingBottom: "0.5rem" }}>
+                  <div className="settings-kv-row">
                     <span style={{ color: "var(--text-secondary)" }}>GitOps Mode:</span>
-                    <span>Commit Manifests updates</span>
+                    <span className="settings-kv-value">Commit Manifests updates</span>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--glass-border)", paddingBottom: "0.5rem" }}>
+                  <div className="settings-kv-row">
                     <span style={{ color: "var(--text-secondary)" }}>Target Branch:</span>
-                    <span style={{ fontFamily: "monospace" }}>main</span>
+                    <span className="settings-kv-value" style={{ fontFamily: "monospace" }}>main</span>
                   </div>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", fontSize: "0.9rem" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--glass-border)", paddingBottom: "0.5rem" }}>
+                <div className="settings-kv-list">
+                  <div className="settings-kv-row">
                     <span style={{ color: "var(--text-secondary)" }}>Remote Sync:</span>
-                    <span>Auto Push enabled</span>
+                    <span className="settings-kv-value">Auto Push enabled</span>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--glass-border)", paddingBottom: "0.5rem" }}>
+                  <div className="settings-kv-row">
                     <span style={{ color: "var(--text-secondary)" }}>Authentication:</span>
-                    <span>SSH Key (id_rsa)</span>
+                    <span className="settings-kv-value">SSH Key (id_rsa)</span>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--glass-border)", paddingBottom: "0.5rem" }}>
+                  <div className="settings-kv-row">
                     <span style={{ color: "var(--text-secondary)" }}>SQLite Path:</span>
-                    <span style={{ fontFamily: "monospace" }}>/app/data/db.sqlite</span>
+                    <span className="settings-kv-value" style={{ fontFamily: "monospace" }}>/app/data/db.sqlite</span>
                   </div>
                 </div>
               </div>
