@@ -9,6 +9,7 @@ export interface Workload {
   current_digest: string;
   new_image?: string;
   new_digest?: string;
+  track_tag?: string;
   update_status: "up_to_date" | "update_available" | "updating" | "failed";
   last_checked_at?: string;
   last_updated_at?: string;

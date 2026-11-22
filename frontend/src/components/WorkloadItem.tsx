@@ -11,8 +11,20 @@ interface WorkloadItemProps {
   };
 }
 
+function extractImageTag(image: string): string {
+  const withoutDigest = image.split("@")[0];
+  const lastSlash = withoutDigest.lastIndexOf("/");
+  const lastColon = withoutDigest.lastIndexOf(":");
+  if (lastColon > lastSlash) {
+    return withoutDigest.slice(lastColon + 1) || "latest";
+  }
+  return "latest";
+}
+
 export default function WorkloadItem({ workload, onTriggerUpdate, progress }: WorkloadItemProps) {
   const isUpdating = workload.update_status === "updating";
+  const currentTag = extractImageTag(workload.current_image);
+  const newTag = workload.new_image ? extractImageTag(workload.new_image) : "latest";
 
   return (
     <div
@@ -115,9 +127,31 @@ export default function WorkloadItem({ workload, onTriggerUpdate, progress }: Wo
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <span style={{ color: "var(--text-secondary)" }}>Current Tag:</span>
             <span style={{ fontFamily: "monospace", color: "var(--text-primary)", fontWeight: "500" }}>
-              {workload.current_image.split(":")[1] || "latest"}
+              {currentTag}
             </span>
           </div>
+          {workload.track_tag && (
+            <div
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
+              title="Configured via YAML annotation/label (read-only)"
+            >
+              <span style={{ color: "var(--text-secondary)" }}>Tracked Channel:</span>
+              <span
+                style={{
+                  fontFamily: "monospace",
+                  fontSize: "0.78rem",
+                  padding: "0.1rem 0.5rem",
+                  borderRadius: "9999px",
+                  background: "rgba(59, 130, 246, 0.14)",
+                  color: "var(--color-info)",
+                  border: "1px solid rgba(59, 130, 246, 0.25)",
+                  fontWeight: 500,
+                }}
+              >
+                {workload.track_tag}
+              </span>
+            </div>
+          )}
           <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
             <span style={{ color: "var(--text-secondary)" }}>Running Image:</span>
             <span
@@ -143,11 +177,11 @@ export default function WorkloadItem({ workload, onTriggerUpdate, progress }: Wo
 
           {workload.update_status === "update_available" && workload.new_digest && (
             <div style={{ marginTop: "0.5rem", borderTop: "1px dashed var(--glass-border)", paddingTop: "0.5rem" }}>
-              {(workload.new_image?.split(":")[1] || "latest") !== (workload.current_image.split(":")[1] || "latest") && (
+              {newTag !== currentTag && (
                 <div style={{ display: "flex", justifyContent: "space-between", color: "var(--color-warning)" }}>
                   <span>New Available Tag:</span>
                   <span style={{ fontFamily: "monospace" }}>
-                    {workload.new_image?.split(":")[1] || "latest"}
+                    {newTag}
                   </span>
                 </div>
               )}
