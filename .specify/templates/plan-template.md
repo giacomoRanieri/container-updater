@@ -1,6 +1,6 @@
 # Implementation Plan: [FEATURE]
 
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
+**Git Branch**: `feat/[short-name]` (base: `develop`) | **Spec Dir**: `specs/[###-feature-name]/` | **Date**: [DATE] | **Spec**: [link]
 
 **Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
 
@@ -40,7 +40,14 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+Verify alignment with [Container Updater Constitution](../../.specify/memory/constitution.md) (v1.0.0):
+
+- [ ] **Principle I (Decoupled Architecture & Pure-Go Runtime)**: Backend (`backend/`, Go) and frontend (`frontend/`, Next.js) communicate strictly via REST/WebSocket contracts; backend builds statically with `CGO_ENABLED=0` and `modernc.org/sqlite`.
+- [ ] **Principle II (Safe Manifest Mutation & GitOps Integrity)**: YAML mutations preserve multi-document separators (`---`), indentation, and AST comments; concurrent workload updates are serialized/rejected; GitOps commits affect only modified manifests.
+- [ ] **Principle III (Security-First Authentication & Secret Handling)**: OIDC enforced when `OIDC_ENABLED=true`; credentials masked in API/UI/logs; runtime frontend config via `/env-config.js`.
+- [ ] **Principle IV (Regression-First Testing & Static Quality Gates)**: Unit/regression tests planned for touched `backend/internal/*` packages (`go test -race`); `go vet`, static build, `pnpm lint`, `tsc --noEmit`, and `pnpm build` verified; Next.js docs in `frontend/node_modules/next/dist/docs/` checked.
+- [ ] **Principle V (Observability, Auditability & Simplicity)**: Structured `slog` logging, SQLite audit log persistence, WebSocket progress events, and YAGNI compliance.
+- [ ] **Git Governance**: Working branch created from `develop` (`feat/*` / `fix/*`), PR targets `develop`, Conventional Commits enforced.
 
 ## Project Structure
 
@@ -57,51 +64,32 @@ specs/[###-feature]/
 ```
 
 ### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
 
 ```text
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
-src/
-├── models/
-├── services/
-├── cli/
-└── lib/
-
-tests/
-├── contract/
-├── integration/
-└── unit/
-
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
 backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
+├── cmd/
+│   └── updater/         # Daemon and API server entry point
+└── internal/
+    ├── api/             # Chi REST handlers and WebSocket hub
+    ├── config/          # Environment and runtime configuration
+    ├── db/              # Pure-Go SQLite schema, queries, and audit logs
+    ├── docker/          # Docker Engine / Compose wrapper
+    ├── git/             # GitOps repository sync
+    ├── k8s/             # Kubernetes client-go, rollout monitor, YAML AST updates
+    ├── logger/          # Structured slog logger
+    ├── monitor/         # Cron runner and update scheduler
+    ├── notify/          # Apprise dispatcher and GitHub changelog fetcher
+    └── registry/        # OCI registry client and semver comparison
 
 frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+└── src/
+    ├── components/      # React dashboard, audit log, and workload UI components
+    ├── pages/           # Next.js Pages Router routes (/, /settings, _document)
+    ├── services/        # REST API, WebSocket, auth, and runtime env config helpers
+    └── styles/          # Vanilla CSS stylesheets
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+**Structure Decision**: Multi-component web application (`backend/` Go daemon + `frontend/` Next.js Pages Router app). Keep feature changes confined to the existing package boundaries above.
 
 ## Complexity Tracking
 

@@ -1,6 +1,8 @@
 # Feature Specification: [FEATURE NAME]
 
-**Feature Branch**: `[###-feature-name]`
+**Spec Directory**: `specs/[###-feature-name]/`
+
+**Git Branch**: `feat/[short-name]` (branched from `develop`, PR target: `develop`)
 
 **Created**: [DATE]
 

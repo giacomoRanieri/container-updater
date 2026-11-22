@@ -8,6 +8,10 @@ ALLOW_EXISTING=false
 SHORT_NAME=""
 BRANCH_NUMBER=""
 USE_TIMESTAMP=false
+BRANCH_TYPE="feat"
+BASE_BRANCH="develop"
+EXPLICIT_BASE=false
+CREATE_BRANCH=false
 ARGS=()
 i=1
 while [ $i -le $# ]; do
@@ -49,23 +53,58 @@ while [ $i -le $# ]; do
             fi
             BRANCH_NUMBER="$next_arg"
             ;;
+        --branch-type)
+            if [ $((i + 1)) -gt $# ]; then
+                echo 'Error: --branch-type requires a value' >&2
+                exit 1
+            fi
+            i=$((i + 1))
+            next_arg="${!i}"
+            if [[ "$next_arg" == --* ]]; then
+                echo 'Error: --branch-type requires a value' >&2
+                exit 1
+            fi
+            BRANCH_TYPE="$next_arg"
+            ;;
+        --base)
+            if [ $((i + 1)) -gt $# ]; then
+                echo 'Error: --base requires a value' >&2
+                exit 1
+            fi
+            i=$((i + 1))
+            next_arg="${!i}"
+            if [[ "$next_arg" == --* ]]; then
+                echo 'Error: --base requires a value' >&2
+                exit 1
+            fi
+            BASE_BRANCH="$next_arg"
+            EXPLICIT_BASE=true
+            ;;
+        --create-branch)
+            CREATE_BRANCH=true
+            ;;
         --timestamp)
             USE_TIMESTAMP=true
             ;;
         --help|-h)
-            echo "Usage: $0 [--json] [--dry-run] [--allow-existing-branch] [--short-name <name>] [--number N] [--timestamp] <feature_description>"
+            echo "Usage: $0 [--json] [--dry-run] [--allow-existing-branch] [--short-name <name>] [--number N] [--timestamp] [--branch-type <type>] [--base <branch>] [--create-branch] <feature_description>"
             echo ""
             echo "Options:"
-            echo "  --json              Output in JSON format"
-            echo "  --dry-run           Compute feature name and paths without creating directories or files"
-            echo "  --allow-existing-branch  Reuse an existing feature directory if it already exists"
-            echo "  --short-name <name> Provide a custom short name (2-4 words) for the feature"
-            echo "  --number N          Specify branch number manually (overrides auto-detection)"
-            echo "  --timestamp         Use timestamp prefix (YYYYMMDD-HHMMSS) instead of sequential numbering"
-            echo "  --help, -h          Show this help message"
+            echo "  --json                  Output in JSON format"
+            echo "  --dry-run               Compute feature name and paths without creating directories, files, or branches"
+            echo "  --allow-existing-branch Reuse an existing feature directory or git branch if it already exists"
+            echo "  --short-name <name>     Provide a custom short name (2-4 words) for the feature"
+            echo "  --number N              Specify branch/spec number manually (overrides auto-detection)"
+            echo "  --timestamp             Use timestamp prefix (YYYYMMDD-HHMMSS) instead of sequential numbering"
+            echo "  --branch-type <type>    Git Flow branch prefix: feat, feature, fix, docs, chore, ci, refactor, test (default: feat)"
+            echo "  --base <branch>         Base branch for Git Flow branch creation (default: develop)"
+            echo "  --create-branch         Create and switch to the Git Flow branch (<type>/<short-name>) from --base"
+            echo "  --help, -h              Show this help message"
             echo ""
             echo "Examples:"
             echo "  $0 'Add user authentication system' --short-name 'user-auth'"
+            echo "  $0 --create-branch --short-name 'user-auth' 'Add user authentication system'"
+            echo "  $0 --branch-type fix --create-branch --short-name 'yaml-bug' 'Fix YAML indent bug'"
             echo "  $0 'Implement OAuth2 integration for API' --number 5"
             echo "  $0 --timestamp --short-name 'user-auth' 'Add user authentication'"
             exit 0
@@ -77,9 +116,18 @@ while [ $i -le $# ]; do
     i=$((i + 1))
 done
 
+case "$BRANCH_TYPE" in
+    feat|feature|fix|docs|chore|ci|refactor|test)
+        ;;
+    *)
+        echo "Error: Invalid --branch-type '$BRANCH_TYPE'. Allowed values: feat, feature, fix, docs, chore, ci, refactor, test" >&2
+        exit 1
+        ;;
+esac
+
 FEATURE_DESCRIPTION="${ARGS[*]}"
 if [ -z "$FEATURE_DESCRIPTION" ]; then
-    echo "Usage: $0 [--json] [--dry-run] [--allow-existing-branch] [--short-name <name>] [--number N] [--timestamp] <feature_description>" >&2
+    echo "Usage: $0 [--json] [--dry-run] [--allow-existing-branch] [--short-name <name>] [--number N] [--timestamp] [--branch-type <type>] [--base <branch>] [--create-branch] <feature_description>" >&2
     exit 1
 fi
 
@@ -128,9 +176,6 @@ REPO_ROOT=$(get_repo_root) || exit 1
 cd "$REPO_ROOT"
 
 SPECS_DIR="$REPO_ROOT/specs"
-if [ "$DRY_RUN" != true ]; then
-    mkdir -p "$SPECS_DIR"
-fi
 
 # Function to generate branch name with stop word filtering and length filtering
 generate_branch_name() {
@@ -238,6 +283,16 @@ fi
 FEATURE_DIR="$SPECS_DIR/$BRANCH_NAME"
 SPEC_FILE="$FEATURE_DIR/spec.md"
 
+BASE_BRANCH="${BASE_BRANCH:-develop}"
+GIT_SUFFIX="${BRANCH_SUFFIX:-feature}"
+GIT_BRANCH="${BRANCH_TYPE}/${GIT_SUFFIX}"
+if [ ${#GIT_BRANCH} -gt $MAX_BRANCH_LENGTH ]; then
+    GIT_PREFIX_LENGTH=$(( ${#BRANCH_TYPE} + 1 ))
+    MAX_GIT_SUFFIX_LENGTH=$((MAX_BRANCH_LENGTH - GIT_PREFIX_LENGTH))
+    GIT_TRUNCATED_SUFFIX=$(echo "$GIT_SUFFIX" | cut -c1-$MAX_GIT_SUFFIX_LENGTH | sed 's/-$//')
+    GIT_BRANCH="${BRANCH_TYPE}/${GIT_TRUNCATED_SUFFIX}"
+fi
+
 if [ "$DRY_RUN" != true ]; then
     if [ -d "$FEATURE_DIR" ] && [ "$ALLOW_EXISTING" != true ]; then
         if [ "$USE_TIMESTAMP" = true ]; then
@@ -248,6 +303,51 @@ if [ "$DRY_RUN" != true ]; then
         exit 1
     fi
 
+    if [ "$CREATE_BRANCH" = true ]; then
+        if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            echo "Error: --create-branch requires running inside a Git repository." >&2
+            exit 1
+        fi
+
+        CURRENT_GIT_BRANCH=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+
+        if [ "$CURRENT_GIT_BRANCH" = "master" ] && [ "$EXPLICIT_BASE" != true ]; then
+            echo "Error: Currently on 'master'. Refusing to branch from 'master'; switch to 'develop' or pass --base develop (or --base master explicitly)." >&2
+            exit 1
+        fi
+        if [ "$BASE_BRANCH" = "master" ] && [ "$EXPLICIT_BASE" != true ]; then
+            echo "Error: Refusing to branch from 'master' unless --base master is explicitly specified." >&2
+            exit 1
+        fi
+
+        if [ -n "$(git status --porcelain)" ]; then
+            echo "Error: Working tree has uncommitted changes. Commit or stash them before creating branch '$GIT_BRANCH'." >&2
+            exit 1
+        fi
+
+        if ! git rev-parse --verify --quiet "refs/heads/$BASE_BRANCH" >/dev/null; then
+            echo "Error: Base branch '$BASE_BRANCH' does not exist locally." >&2
+            exit 1
+        fi
+
+        if [ "$CURRENT_GIT_BRANCH" = "$GIT_BRANCH" ]; then
+            if [ "$ALLOW_EXISTING" != true ]; then
+                echo "Error: Already on Git branch '$GIT_BRANCH'. Pass --allow-existing-branch to reuse it." >&2
+                exit 1
+            fi
+            echo "[specify] Reusing current Git branch '$GIT_BRANCH'" >&2
+        elif git rev-parse --verify --quiet "refs/heads/$GIT_BRANCH" >/dev/null; then
+            if [ "$ALLOW_EXISTING" != true ]; then
+                echo "Error: Git branch '$GIT_BRANCH' already exists. Pass --allow-existing-branch to check it out." >&2
+                exit 1
+            fi
+            git checkout "$GIT_BRANCH" >&2
+        else
+            git checkout -b "$GIT_BRANCH" "$BASE_BRANCH" >&2
+        fi
+    fi
+
+    mkdir -p "$SPECS_DIR"
     mkdir -p "$FEATURE_DIR"
 
     if [ ! -f "$SPEC_FILE" ]; then
@@ -268,6 +368,16 @@ if [ "$DRY_RUN" != true ]; then
     printf '#              export SPECIFY_FEATURE_DIRECTORY=%q\n' "$FEATURE_DIR" >&2
 fi
 
+if [ "$CREATE_BRANCH" != true ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    CURRENT_GIT_BRANCH=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+    if [ "$CURRENT_GIT_BRANCH" = "master" ]; then
+        printf '[specify] Warning: Currently on '\''master'\''. New features must branch off '\''develop'\'': git checkout -b %q develop\n' "$GIT_BRANCH" >&2
+    fi
+    if [ "$DRY_RUN" != true ]; then
+        printf '# Git Flow branch (from %s): git checkout -b %q %q\n' "$BASE_BRANCH" "$GIT_BRANCH" "$BASE_BRANCH" >&2
+    fi
+fi
+
 if $JSON_MODE; then
     if command -v jq >/dev/null 2>&1; then
         if [ "$DRY_RUN" = true ]; then
@@ -275,25 +385,33 @@ if $JSON_MODE; then
                 --arg branch_name "$BRANCH_NAME" \
                 --arg spec_file "$SPEC_FILE" \
                 --arg feature_num "$FEATURE_NUM" \
-                '{BRANCH_NAME:$branch_name,SPEC_FILE:$spec_file,FEATURE_NUM:$feature_num,DRY_RUN:true}'
+                --arg git_branch "$GIT_BRANCH" \
+                --arg base_branch "$BASE_BRANCH" \
+                '{BRANCH_NAME:$branch_name,SPEC_FILE:$spec_file,FEATURE_NUM:$feature_num,GIT_BRANCH:$git_branch,BASE_BRANCH:$base_branch,DRY_RUN:true}'
         else
             jq -cn \
                 --arg branch_name "$BRANCH_NAME" \
                 --arg spec_file "$SPEC_FILE" \
                 --arg feature_num "$FEATURE_NUM" \
-                '{BRANCH_NAME:$branch_name,SPEC_FILE:$spec_file,FEATURE_NUM:$feature_num}'
+                --arg git_branch "$GIT_BRANCH" \
+                --arg base_branch "$BASE_BRANCH" \
+                '{BRANCH_NAME:$branch_name,SPEC_FILE:$spec_file,FEATURE_NUM:$feature_num,GIT_BRANCH:$git_branch,BASE_BRANCH:$base_branch}'
         fi
     else
         if [ "$DRY_RUN" = true ]; then
-            printf '{"BRANCH_NAME":"%s","SPEC_FILE":"%s","FEATURE_NUM":"%s","DRY_RUN":true}\n' "$(json_escape "$BRANCH_NAME")" "$(json_escape "$SPEC_FILE")" "$(json_escape "$FEATURE_NUM")"
+            printf '{"BRANCH_NAME":"%s","SPEC_FILE":"%s","FEATURE_NUM":"%s","GIT_BRANCH":"%s","BASE_BRANCH":"%s","DRY_RUN":true}\n' \
+                "$(json_escape "$BRANCH_NAME")" "$(json_escape "$SPEC_FILE")" "$(json_escape "$FEATURE_NUM")" "$(json_escape "$GIT_BRANCH")" "$(json_escape "$BASE_BRANCH")"
         else
-            printf '{"BRANCH_NAME":"%s","SPEC_FILE":"%s","FEATURE_NUM":"%s"}\n' "$(json_escape "$BRANCH_NAME")" "$(json_escape "$SPEC_FILE")" "$(json_escape "$FEATURE_NUM")"
+            printf '{"BRANCH_NAME":"%s","SPEC_FILE":"%s","FEATURE_NUM":"%s","GIT_BRANCH":"%s","BASE_BRANCH":"%s"}\n' \
+                "$(json_escape "$BRANCH_NAME")" "$(json_escape "$SPEC_FILE")" "$(json_escape "$FEATURE_NUM")" "$(json_escape "$GIT_BRANCH")" "$(json_escape "$BASE_BRANCH")"
         fi
     fi
 else
     echo "BRANCH_NAME: $BRANCH_NAME"
     echo "SPEC_FILE: $SPEC_FILE"
     echo "FEATURE_NUM: $FEATURE_NUM"
+    echo "GIT_BRANCH: $GIT_BRANCH"
+    echo "BASE_BRANCH: $BASE_BRANCH"
     if [ "$DRY_RUN" != true ]; then
         printf '# To persist in your shell: export SPECIFY_FEATURE=%q\n' "$BRANCH_NAME"
         printf '#                           export SPECIFY_FEATURE_DIRECTORY=%q\n' "$FEATURE_DIR"

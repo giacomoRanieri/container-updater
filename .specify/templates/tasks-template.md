@@ -9,7 +9,7 @@ description: "Task list template for feature implementation"
 
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
+**Tests**: Per Constitution Principle IV, automated Go unit/regression tests are REQUIRED for changes in critical backend packages (`internal/k8s`, `internal/docker`, `internal/registry`, `internal/git`, `internal/db`, `internal/api`) and for every bugfix. Frontend changes MUST pass lint, typecheck, and production build.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -21,10 +21,9 @@ description: "Task list template for feature implementation"
 
 ## Path Conventions
 
-- **Single project**: `src/`, `tests/` at repository root
-- **Web app**: `backend/src/`, `frontend/src/`
-- **Mobile**: `api/src/`, `ios/src/` or `android/src/`
-- Paths shown below assume single project - adjust based on plan.md structure
+- **Backend (Go)**: `backend/cmd/updater/`, `backend/internal/<package>/` (tests colocated as `*_test.go`)
+- **Frontend (Next.js)**: `frontend/src/components/`, `frontend/src/pages/`, `frontend/src/services/`, `frontend/src/styles/`
+- **Specs & Contracts**: `specs/[###-feature-name]/`
 
 <!--
   ============================================================================
@@ -149,14 +148,14 @@ Examples of foundational tasks (adjust based on your project):
 
 ## Phase N: Polish & Cross-Cutting Concerns
 
-**Purpose**: Improvements that affect multiple user stories
+**Purpose**: Improvements, quality gates, and Git Flow verification across all user stories
 
-- [ ] TXXX [P] Documentation updates in docs/
-- [ ] TXXX Code cleanup and refactoring
-- [ ] TXXX Performance optimization across all stories
-- [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
-- [ ] TXXX Security hardening
-- [ ] TXXX Run quickstart.md validation
+- [ ] TXXX [P] Update documentation (`README.md`, `specs/[###-feature-name]/quickstart.md`, or contracts) if behavior or env vars changed
+- [ ] TXXX Code cleanup and refactoring (verify YAGNI and no duplicated logic)
+- [ ] TXXX [P] Add or expand unit/regression tests in `backend/internal/*/*_test.go`
+- [ ] TXXX Verify backend static checks: `cd backend && go vet ./... && go test -race -count=1 ./... && CGO_ENABLED=0 GOOS=linux go build -o /dev/null ./cmd/updater`
+- [ ] TXXX Verify frontend static checks: `cd frontend && pnpm lint && npx tsc --noEmit && pnpm build`
+- [ ] TXXX Verify Git Flow compliance: Conventional Commits on `feat/*` / `fix/*` branch off `develop`, PR targeting `develop`
 
 ---
 
