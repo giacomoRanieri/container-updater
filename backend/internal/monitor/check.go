@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -17,41 +18,57 @@ import (
 	dockertypes "github.com/docker/docker/api/types/registry"
 )
 
-// CheckWorkloadUpdate compares the running digest of a workload with its remote registry digest
+type registryAPI interface {
+	FetchDigest(ctx context.Context, imageRef, username, password string) (string, error)
+	ListTags(ctx context.Context, imageRef, username, password string) ([]string, error)
+	FetchImageLabels(ctx context.Context, imageRef, username, password string) (map[string]string, error)
+}
+
+const maxFallbackDigestChecks = 15
+
+// CheckWorkloadUpdate compares the running digest/tag of a workload against its remote registry.
 func CheckWorkloadUpdate(ctx context.Context, dockerClient *docker.DockerClient, w *db.Workload) (bool, error) {
-	// 1. Resolve registry host from image name
 	registryHost := resolveRegistryHost(w.CurrentImage)
 
-	// 2. Fetch registry credentials from DB if they exist
 	var username, password string
-	query := `SELECT username, password FROM registry_credentials WHERE server_address = ?`
-	err := db.DB.QueryRow(query, registryHost).Scan(&username, &password)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		logger.Log.Error("database query failed for registry credentials", "registry", registryHost, "error", err)
+	if db.DB != nil {
+		query := `SELECT username, password FROM registry_credentials WHERE server_address = ?`
+		err := db.DB.QueryRow(query, registryHost).Scan(&username, &password)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			logger.Log.Error("database query failed for registry credentials", "registry", registryHost, "error", err)
+		}
 	}
 
-	// 3. Query remote OCI registry directly via HTTP
-	regClient := registry.NewClient()
+	return checkWorkloadWithRegistry(ctx, registry.NewClient(), dockerClient, w, registryHost, username, password)
+}
 
-	// 3a. Attempt SemVer tag tracking if current image tag is a version
-	currentTag := "latest"
-	if idx := strings.LastIndex(w.CurrentImage, ":"); idx != -1 && !strings.Contains(w.CurrentImage[idx:], "/") {
-		currentTag = w.CurrentImage[idx+1:]
+func checkWorkloadWithRegistry(
+	ctx context.Context,
+	regClient registryAPI,
+	dockerClient *docker.DockerClient,
+	w *db.Workload,
+	registryHost, username, password string,
+) (bool, error) {
+	repo, currentTag := splitImageRepoTag(w.CurrentImage)
+
+	// 1. Explicit opt-in channel pointer tracking (e.g. track-tag: "stable")
+	if w.TrackTag != nil {
+		trackTag := strings.TrimSpace(*w.TrackTag)
+		if trackTag != "" && currentTag != trackTag {
+			return checkTrackedChannel(ctx, regClient, w, repo, currentTag, trackTag, username, password)
+		}
 	}
 
-	if currentTag != "latest" {
+	// 2. Default schema- & flavor-aware version tag tracking (skip ListTags for non-version tags)
+	if _, isVersion := registry.ParseVersion(currentTag); currentTag != "latest" && isVersion {
 		tags, err := regClient.ListTags(ctx, w.CurrentImage, username, password)
 		if err == nil {
 			if latestSemverTag, found := registry.FindLatestMatchingTag(currentTag, tags); found {
-				repo := w.CurrentImage
-				if idx := strings.LastIndex(repo, ":"); idx != -1 && !strings.Contains(repo[idx:], "/") {
-					repo = repo[:idx]
-				}
 				newerImageRef := repo + ":" + latestSemverTag
 				newerDigest, err := regClient.FetchDigest(ctx, newerImageRef, username, password)
 				if err == nil {
 					cleanNewerDigest := strings.TrimPrefix(newerDigest, "sha256:")
-					logger.Log.Info("New SemVer release tag found", "workload", w.Name, "currentTag", currentTag, "newerTag", latestSemverTag)
+					logger.Log.Info("New compatible version release tag found", "workload", w.Name, "currentTag", currentTag, "newerTag", latestSemverTag)
 					w.NewImage = &newerImageRef
 					w.NewDigest = &cleanNewerDigest
 					w.UpdateStatus = "update_available"
@@ -65,7 +82,7 @@ func CheckWorkloadUpdate(ctx context.Context, dockerClient *docker.DockerClient,
 		}
 	}
 
-	// 3b. Fallback to same-tag digest comparison
+	// 3. Fallback to same-tag digest comparison
 	cleanRemote, err := regClient.FetchDigest(ctx, w.CurrentImage, username, password)
 	if err != nil {
 		logger.Log.Warn("HTTP OCI registry inspect failed, trying Docker client fallback", "image", w.CurrentImage, "error", err)
@@ -75,23 +92,161 @@ func CheckWorkloadUpdate(ctx context.Context, dockerClient *docker.DockerClient,
 		return false, err
 	}
 
+	cleanRemote = strings.TrimPrefix(cleanRemote, "sha256:")
 	cleanCurrent := strings.TrimPrefix(w.CurrentDigest, "sha256:")
 	logger.Log.Info("Compare image digests", "workload", w.Name, "current", cleanCurrent, "remote", cleanRemote)
 
-	w.NewDigest = &cleanRemote
 	now := time.Now()
 	w.LastCheckedAt = &now
 
 	if cleanRemote != cleanCurrent && cleanCurrent != "" {
 		w.NewImage = &w.CurrentImage
+		w.NewDigest = &cleanRemote
 		w.UpdateStatus = "update_available"
 		return true, nil
 	}
 
+	markUpToDate(w, now)
+	return false, nil
+}
+
+func checkTrackedChannel(
+	ctx context.Context,
+	regClient registryAPI,
+	w *db.Workload,
+	repo, currentTag, trackTag, username, password string,
+) (bool, error) {
+	trackImageRef := repo + ":" + trackTag
+	trackDigest, err := regClient.FetchDigest(ctx, trackImageRef, username, password)
+	if err != nil {
+		return false, fmt.Errorf("failed to fetch tracked tag %q for %s: %w", trackTag, w.CurrentImage, err)
+	}
+	trackDigest = strings.TrimPrefix(trackDigest, "sha256:")
+
+	now := time.Now()
+
+	// Compare tracked channel digest against current tag's remote digest first, then running digest.
+	if currentTagDigest, err := regClient.FetchDigest(ctx, w.CurrentImage, username, password); err == nil {
+		if strings.TrimPrefix(currentTagDigest, "sha256:") == trackDigest {
+			markUpToDate(w, now)
+			return false, nil
+		}
+	}
+	if cleanCurrent := strings.TrimPrefix(w.CurrentDigest, "sha256:"); cleanCurrent != "" && cleanCurrent == trackDigest {
+		markUpToDate(w, now)
+		return false, nil
+	}
+
+	resolvedTag := resolvePinnedTagFromChannel(ctx, regClient, w.CurrentImage, repo, currentTag, trackImageRef, trackDigest, username, password)
+
+	// Guard against proposing a downgrade if running version is already ahead of tracked channel.
+	if resolvedTag != "" {
+		if curVer, ok1 := registry.ParseVersion(currentTag); ok1 {
+			if resVer, ok2 := registry.ParseVersion(resolvedTag); ok2 && curVer.IsCompatibleWith(resVer) && curVer.GreaterThan(resVer) {
+				logger.Log.Info("Running version is ahead of tracked channel tag; skipping downgrade",
+					"workload", w.Name, "currentTag", currentTag, "trackTag", trackTag, "resolvedTag", resolvedTag)
+				markUpToDate(w, now)
+				return false, nil
+			}
+		}
+	}
+
+	if resolvedTag == "" {
+		logger.Log.Warn("Tracked channel digest changed but no matching pinned version tag found; falling back to tracked channel tag",
+			"workload", w.Name, "currentImage", w.CurrentImage, "trackTag", trackTag)
+		resolvedTag = trackTag
+	}
+
+	newerImageRef := repo + ":" + resolvedTag
+	logger.Log.Info("Update available on tracked channel",
+		"workload", w.Name, "currentTag", currentTag, "trackTag", trackTag, "resolvedTag", resolvedTag)
+
+	w.NewImage = &newerImageRef
+	w.NewDigest = &trackDigest
+	w.UpdateStatus = "update_available"
+	w.LastCheckedAt = &now
+	return true, nil
+}
+
+func resolvePinnedTagFromChannel(
+	ctx context.Context,
+	regClient registryAPI,
+	currentImage, repo, currentTag, trackImageRef, trackDigest, username, password string,
+) string {
+	// Strategy 1: Inspect OCI org.opencontainers.image.version label on tracked channel
+	if labels, err := regClient.FetchImageLabels(ctx, trackImageRef, username, password); err == nil {
+		if ver := strings.TrimSpace(labels["org.opencontainers.image.version"]); ver != "" {
+			for _, candTag := range buildVersionTagCandidates(ver, currentTag) {
+				if candTag == currentTag {
+					continue
+				}
+				if candDigest, err := regClient.FetchDigest(ctx, repo+":"+candTag, username, password); err == nil {
+					if strings.TrimPrefix(candDigest, "sha256:") == trackDigest {
+						return candTag
+					}
+				}
+			}
+		}
+	} else {
+		logger.Log.Debug("OCI label inspection failed for tracked tag", "image", trackImageRef, "error", err)
+	}
+
+	// Strategy 2: Fallback digest match against compatible higher version tags
+	tags, err := regClient.ListTags(ctx, currentImage, username, password)
+	if err != nil {
+		return ""
+	}
+	candidates, ok := registry.FindMatchingTagsDescending(currentTag, tags)
+	if !ok {
+		return ""
+	}
+	limit := maxFallbackDigestChecks
+	if len(candidates) < limit {
+		limit = len(candidates)
+	}
+	for _, cand := range candidates[:limit] {
+		if candDigest, err := regClient.FetchDigest(ctx, repo+":"+cand.Original, username, password); err == nil {
+			if strings.TrimPrefix(candDigest, "sha256:") == trackDigest {
+				return cand.Original
+			}
+		}
+	}
+	return ""
+}
+
+func buildVersionTagCandidates(ver, currentTag string) []string {
+	var adjusted string
+	if strings.HasPrefix(currentTag, "v") && !strings.HasPrefix(ver, "v") {
+		adjusted = "v" + ver
+	} else if !strings.HasPrefix(currentTag, "v") && strings.HasPrefix(ver, "v") {
+		adjusted = strings.TrimPrefix(ver, "v")
+	}
+
+	if adjusted != "" && adjusted != ver {
+		return []string{adjusted, ver}
+	}
+	return []string{ver}
+}
+
+func markUpToDate(w *db.Workload, checkedAt time.Time) {
 	w.NewImage = nil
 	w.NewDigest = nil
 	w.UpdateStatus = "up_to_date"
-	return false, nil
+	w.LastCheckedAt = &checkedAt
+}
+
+func splitImageRepoTag(imageRef string) (repo, tag string) {
+	ref := imageRef
+	if atIdx := strings.Index(ref, "@"); atIdx != -1 {
+		ref = ref[:atIdx]
+	}
+	tag = "latest"
+	if idx := strings.LastIndex(ref, ":"); idx != -1 && !strings.Contains(ref[idx:], "/") {
+		tag = ref[idx+1:]
+		repo = ref[:idx]
+		return repo, tag
+	}
+	return ref, tag
 }
 
 func checkViaDockerClient(ctx context.Context, dockerClient *docker.DockerClient, w *db.Workload, registryHost, username, password string) (bool, error) {
@@ -128,25 +283,24 @@ func checkViaDockerClient(ctx context.Context, dockerClient *docker.DockerClient
 	cleanRemote := strings.TrimPrefix(remoteDigest, "sha256:")
 	cleanCurrent := strings.TrimPrefix(w.CurrentDigest, "sha256:")
 
-	w.NewDigest = &cleanRemote
 	now := time.Now()
 	w.LastCheckedAt = &now
 
 	if cleanRemote != cleanCurrent && cleanCurrent != "" {
 		w.NewImage = &w.CurrentImage
+		w.NewDigest = &cleanRemote
 		w.UpdateStatus = "update_available"
 		return true, nil
 	}
 
-	w.NewImage = nil
-	w.NewDigest = nil
-	w.UpdateStatus = "up_to_date"
+	markUpToDate(w, now)
 	return false, nil
 }
 
 // resolveRegistryHost parses the image reference and extracts the registry domain
 func resolveRegistryHost(imageRef string) string {
-	parts := strings.Split(imageRef, "/")
+	repo, _ := splitImageRepoTag(imageRef)
+	parts := strings.Split(repo, "/")
 	if len(parts) <= 1 {
 		return "docker.io"
 	}

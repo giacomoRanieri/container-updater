@@ -37,6 +37,10 @@ func Init(dbPath string) error {
 		return fmt.Errorf("failed to run database schemas: %w", err)
 	}
 
+	if err := migrateSchemas(); err != nil {
+		return fmt.Errorf("failed to migrate database schemas: %w", err)
+	}
+
 	logger.Log.Info("SQLite Database initialized and schemas verified", "path", dbPath)
 	return nil
 }
@@ -52,6 +56,7 @@ func createSchemas() error {
 			current_digest TEXT NOT NULL,
 			new_image TEXT,
 			new_digest TEXT,
+			track_tag TEXT,
 			update_status TEXT NOT NULL DEFAULT 'up_to_date',
 			last_checked_at DATETIME,
 			last_updated_at DATETIME
@@ -88,6 +93,44 @@ func createSchemas() error {
 		if _, err := DB.Exec(schema); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func migrateSchemas() error {
+	rows, err := DB.Query(`PRAGMA table_info(workloads)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	hasTrackTag := false
+	for rows.Next() {
+		var (
+			cid       int
+			name      string
+			colType   string
+			notNull   int
+			dfltValue sql.NullString
+			pk        int
+		)
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &dfltValue, &pk); err != nil {
+			return err
+		}
+		if name == "track_tag" {
+			hasTrackTag = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	if !hasTrackTag {
+		if _, err := DB.Exec(`ALTER TABLE workloads ADD COLUMN track_tag TEXT;`); err != nil {
+			return err
+		}
+		logger.Log.Info("Migrated workloads table to include track_tag column")
 	}
 
 	return nil

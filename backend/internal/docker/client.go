@@ -101,10 +101,18 @@ func (d *DockerClient) ListMonitoredContainers(ctx context.Context) ([]*db.Workl
 			OrchestratorType: "compose",
 			CurrentImage:     currentImageName,
 			CurrentDigest:    currentDigest,
+			TrackTag:         resolveDockerTrackTag(c.Labels),
 			UpdateStatus:     status,
 			LastCheckedAt:    &now,
 		})
 	}
 
 	return workloads, nil
+}
+
+func resolveDockerTrackTag(labels map[string]string) *string {
+	if val := strings.TrimSpace(labels["container-updater.track-tag"]); val != "" {
+		return &val
+	}
+	return nil
 }

@@ -79,6 +79,34 @@ metadata:
 spec: ...
 ```
 
+### Smart Version Matching & Explicit Channel Tracking (`track-tag`)
+By default, version-pinned images are compared strictly within the same versioning scheme (SemVer vs CalVer vs compact `YYYYMMDD` dates vs single-major tags), segment count, `v`-prefix, and image flavor suffix (e.g. `-alpine`), preventing cross-stream false positives.
+
+When an image publishes pre-release/next SemVer tags or platform revisions without distinct version suffixes (such as `n8nio/n8n` `stable` vs `next`, or `linuxserver` `-ls<N>` tags), keep a pinned version tag in your YAML and explicitly opt into tracking a channel pointer tag (such as `stable` or `latest`):
+* **Docker Compose label**: `container-updater.track-tag=stable`
+* **Kubernetes annotation**: `container-updater.track-tag: "stable"` (on `metadata.annotations` or `spec.template.metadata.annotations`)
+* **Kubernetes multi-container override**: `container-updater.<container-name>.track-tag: "latest"` (takes precedence over `container-updater.track-tag` for that container)
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wireguard
+  annotations:
+    container-updater.enable: "true"
+    container-updater.wireguard.track-tag: "latest"
+spec:
+  template:
+    spec:
+      containers:
+        - name: wireguard
+          image: lscr.io/linuxserver/wireguard:1.0.20260223-r0-ls117
+        - name: wg-portal
+          image: wgportal/wg-portal:v2.3.1
+```
+
+Container Updater compares digests against the tracked channel tag and resolves the corresponding pinned version tag via the image's `org.opencontainers.image.version` OCI label (falling back to compatible digest-matched tags), preventing downgrades if you are already running a newer release.
+
 ---
 
 ## ⚙️ Environment Variables
