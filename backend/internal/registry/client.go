@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 )
+
+const maxOCIResponseBytes = 2 << 20 // 2 MiB cap for manifest/config JSON payloads
 
 type Client struct {
 	httpClient *http.Client
@@ -20,6 +23,14 @@ func NewClient() *Client {
 			Timeout: 15 * time.Second,
 		},
 	}
+}
+
+// NewClientWithHTTPClient creates a registry Client using a caller-supplied http.Client (primarily for tests).
+func NewClientWithHTTPClient(httpClient *http.Client) *Client {
+	if httpClient == nil {
+		return NewClient()
+	}
+	return &Client{httpClient: httpClient}
 }
 
 // FetchDigest queries the OCI Registry v2 API directly via HTTP/HTTPS
@@ -146,41 +157,11 @@ func (c *Client) ListTags(ctx context.Context, imageRef, username, password stri
 // nextURL is non-empty when the registry signals more pages via a Link header.
 // bearerToken is returned (non-empty) only on the first page when auth is negotiated.
 func (c *Client) fetchTagPage(ctx context.Context, pageURL, host, username, password, bearerToken string) ([]string, string, string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
+	resp, bearerToken, err := c.doAuthenticatedGET(ctx, pageURL, "", host, username, password, bearerToken)
 	if err != nil {
 		return nil, "", "", err
 	}
-	if bearerToken != "" {
-		req.Header.Set("Authorization", "Bearer "+bearerToken)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, "", "", fmt.Errorf("failed HTTP request to list tags from %s: %w", host, err)
-	}
 	defer resp.Body.Close()
-
-	// Handle auth challenge on the first page
-	if resp.StatusCode == http.StatusUnauthorized && bearerToken == "" {
-		authHeader := resp.Header.Get("Www-Authenticate")
-		token, err := c.obtainToken(ctx, authHeader, username, password)
-		if err != nil {
-			return nil, "", "", fmt.Errorf("registry auth failed for %s: %w", host, err)
-		}
-		bearerToken = token
-
-		req, err = http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
-		if err != nil {
-			return nil, "", "", err
-		}
-		req.Header.Set("Authorization", "Bearer "+bearerToken)
-
-		resp, err = c.httpClient.Do(req)
-		if err != nil {
-			return nil, "", "", fmt.Errorf("failed authenticated tag list request to %s: %w", host, err)
-		}
-		defer resp.Body.Close()
-	}
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, "", "", fmt.Errorf("registry returned HTTP %d for %s", resp.StatusCode, pageURL)
@@ -199,6 +180,197 @@ func (c *Client) fetchTagPage(ctx context.Context, pageURL, host, username, pass
 	nextURL := parseLinkNext(resp.Header.Get("Link"), host)
 
 	return tagResp.Tags, nextURL, bearerToken, nil
+}
+
+type ociManifestEntry struct {
+	Digest      string            `json:"digest"`
+	MediaType   string            `json:"mediaType"`
+	Annotations map[string]string `json:"annotations"`
+	Platform    *struct {
+		Architecture string `json:"architecture"`
+		OS           string `json:"os"`
+	} `json:"platform"`
+}
+
+type ociManifestDoc struct {
+	MediaType   string            `json:"mediaType"`
+	Annotations map[string]string `json:"annotations"`
+	Config      *struct {
+		Digest string `json:"digest"`
+	} `json:"config"`
+	Manifests []ociManifestEntry `json:"manifests"`
+}
+
+const (
+	indexAndManifestAccept = "application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.index.v1+json"
+	singleManifestAccept   = "application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json"
+	configBlobAccept       = "application/vnd.oci.image.config.v1+json, application/vnd.docker.container.image.v1+json, application/json, */*"
+)
+
+// FetchImageLabels retrieves OCI image config labels (and manifest annotation fallbacks)
+// for imageRef, handling multi-arch indexes, Buildx attestations, and Bearer auth.
+func (c *Client) FetchImageLabels(ctx context.Context, imageRef, username, password string) (map[string]string, error) {
+	host, repo, tag := parseImageRef(imageRef)
+	manifestURL := fmt.Sprintf("https://%s/v2/%s/manifests/%s", host, repo, tag)
+
+	var doc ociManifestDoc
+	bearerToken, err := c.fetchJSONWithAuth(ctx, manifestURL, indexAndManifestAccept, host, username, password, "", &doc)
+	if err != nil {
+		return nil, err
+	}
+
+	fallbackLabels := make(map[string]string)
+	mergeLabels(fallbackLabels, doc.Annotations)
+
+	var configDigest string
+	if doc.Config != nil && doc.Config.Digest != "" {
+		configDigest = doc.Config.Digest
+	} else if len(doc.Manifests) > 0 {
+		selected, ok := selectBestManifest(doc.Manifests)
+		if ok {
+			mergeLabels(fallbackLabels, selected.Annotations)
+			childURL := fmt.Sprintf("https://%s/v2/%s/manifests/%s", host, repo, selected.Digest)
+			var childDoc ociManifestDoc
+			bearerToken, err = c.fetchJSONWithAuth(ctx, childURL, singleManifestAccept, host, username, password, bearerToken, &childDoc)
+			if err != nil {
+				return nil, err
+			}
+			mergeLabels(fallbackLabels, childDoc.Annotations)
+			if childDoc.Config != nil {
+				configDigest = childDoc.Config.Digest
+			}
+		}
+	}
+
+	if configDigest == "" {
+		if len(fallbackLabels) > 0 {
+			return fallbackLabels, nil
+		}
+		return nil, fmt.Errorf("missing config digest in manifest for %s", imageRef)
+	}
+
+	blobURL := fmt.Sprintf("https://%s/v2/%s/blobs/%s", host, repo, configDigest)
+	var cfgDoc struct {
+		Config struct {
+			Labels map[string]string `json:"Labels"`
+		} `json:"config"`
+	}
+	if _, err := c.fetchJSONWithAuth(ctx, blobURL, configBlobAccept, host, username, password, bearerToken, &cfgDoc); err != nil {
+		return nil, err
+	}
+
+	labels := make(map[string]string, len(fallbackLabels)+len(cfgDoc.Config.Labels))
+	mergeLabels(labels, fallbackLabels)
+	mergeLabels(labels, cfgDoc.Config.Labels)
+	return labels, nil
+}
+
+func (c *Client) fetchJSONWithAuth(ctx context.Context, reqURL, acceptHeader, host, username, password, bearerToken string, dest any) (string, error) {
+	resp, token, err := c.doAuthenticatedGET(ctx, reqURL, acceptHeader, host, username, password, bearerToken)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("registry returned HTTP %d for %s", resp.StatusCode, reqURL)
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxOCIResponseBytes))
+	if err != nil {
+		return "", fmt.Errorf("failed reading response from %s: %w", reqURL, err)
+	}
+	if err := json.Unmarshal(body, dest); err != nil {
+		return "", fmt.Errorf("failed decoding JSON from %s: %w", reqURL, err)
+	}
+	return token, nil
+}
+
+func (c *Client) doAuthenticatedGET(ctx context.Context, reqURL, acceptHeader, host, username, password, bearerToken string) (*http.Response, string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	if acceptHeader != "" {
+		req.Header.Set("Accept", acceptHeader)
+	}
+	if bearerToken != "" {
+		req.Header.Set("Authorization", "Bearer "+bearerToken)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed HTTP GET request to %s: %w", host, err)
+	}
+
+	if resp.StatusCode == http.StatusUnauthorized && bearerToken == "" {
+		authHeader := resp.Header.Get("Www-Authenticate")
+		resp.Body.Close()
+
+		token, err := c.obtainToken(ctx, authHeader, username, password)
+		if err != nil {
+			return nil, "", fmt.Errorf("registry auth failed for %s: %w", host, err)
+		}
+		bearerToken = token
+
+		req, err = http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+		if err != nil {
+			return nil, "", err
+		}
+		if acceptHeader != "" {
+			req.Header.Set("Accept", acceptHeader)
+		}
+		req.Header.Set("Authorization", "Bearer "+bearerToken)
+
+		resp, err = c.httpClient.Do(req)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed authenticated HTTP GET request to %s: %w", host, err)
+		}
+	}
+
+	return resp, bearerToken, nil
+}
+
+func selectBestManifest(manifests []ociManifestEntry) (ociManifestEntry, bool) {
+	var valid []ociManifestEntry
+	for _, m := range manifests {
+		if m.Digest == "" {
+			continue
+		}
+		if m.Annotations["vnd.docker.reference.type"] == "attestation-manifest" {
+			continue
+		}
+		if m.Platform != nil && (m.Platform.OS == "unknown" || m.Platform.Architecture == "unknown") {
+			continue
+		}
+		valid = append(valid, m)
+	}
+	if len(valid) == 0 {
+		return ociManifestEntry{}, false
+	}
+
+	for _, m := range valid {
+		if m.Platform != nil && m.Platform.OS == "linux" && m.Platform.Architecture == "amd64" {
+			return m, true
+		}
+	}
+	for _, m := range valid {
+		if m.Platform != nil && m.Platform.OS == "linux" && m.Platform.Architecture == "arm64" {
+			return m, true
+		}
+	}
+	for _, m := range valid {
+		if m.Platform != nil && m.Platform.OS == "linux" {
+			return m, true
+		}
+	}
+	return valid[0], true
+}
+
+func mergeLabels(dst, src map[string]string) {
+	for k, v := range src {
+		dst[k] = v
+	}
 }
 
 // parseLinkNext extracts the absolute URL from a RFC 5988 Link header with rel="next".
@@ -225,12 +397,7 @@ func parseLinkNext(linkHeader, host string) string {
 
 
 func setManifestHeaders(req *http.Request) {
-	req.Header.Set("Accept", strings.Join([]string{
-		"application/vnd.docker.distribution.manifest.v2+json",
-		"application/vnd.oci.image.manifest.v1+json",
-		"application/vnd.docker.distribution.manifest.list.v2+json",
-		"application/vnd.oci.image.index.v1+json",
-	}, ", "))
+	req.Header.Set("Accept", indexAndManifestAccept)
 }
 
 func (c *Client) obtainToken(ctx context.Context, wwwAuthHeader, username, password string) (string, error) {

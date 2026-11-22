@@ -113,8 +113,8 @@ func (s *MonitorScheduler) RunCheck(ctx context.Context) {
 			logger.Log.Error("registry check failed for workload", "name", w.Name, "error", err)
 			w.UpdateStatus = "failed"
 		} else if isNewUpdate {
-			// Only notify if update status changed to 'update_available' or if we hadn't notified yet
-			if existing == nil || existing.UpdateStatus != "update_available" {
+			// Notify if update newly detected or target image changed
+			if existing == nil || existing.UpdateStatus != "update_available" || !stringPtrEqual(existing.NewImage, w.NewImage) {
 				logger.Log.Info("new update detected, preparing notification...", "workload", w.Name)
 				s.notifyUpdate(ctx, w)
 			}
@@ -129,18 +129,41 @@ func (s *MonitorScheduler) RunCheck(ctx context.Context) {
 	logger.Log.Info("Scheduled workload check sequence completed.")
 }
 
+func stringPtrEqual(a, b *string) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
 func (s *MonitorScheduler) notifyUpdate(ctx context.Context, w *db.Workload) {
 	title := fmt.Sprintf("Update Available for %s", w.Name)
-	
+
+	newDigest := ""
+	if w.NewDigest != nil {
+		newDigest = *w.NewDigest
+	}
+
+	var extraLines strings.Builder
+	if w.NewImage != nil && *w.NewImage != "" {
+		fmt.Fprintf(&extraLines, "* **New Image**: %s\n", *w.NewImage)
+	}
+	if w.TrackTag != nil && *w.TrackTag != "" {
+		fmt.Fprintf(&extraLines, "* **Tracked Channel**: %s\n", *w.TrackTag)
+	}
+
 	body := fmt.Sprintf(`### Container Update Detected 🚀
 
 * **Workload Name**: %s
 * **Orchestrator**: %s
 * **Namespace/Project**: %s
 * **Current Image**: %s
-* **Current Digest**: %s
+%s* **Current Digest**: %s
 * **New Digest**: %s
-`, w.Name, w.OrchestratorType, w.NamespaceProject, w.CurrentImage, w.CurrentDigest, *w.NewDigest)
+`, w.Name, w.OrchestratorType, w.NamespaceProject, w.CurrentImage, extraLines.String(), w.CurrentDigest, newDigest)
 
 	// Fetch changelog if image has a linked GitHub source in container image inspect labels
 	// We check for Docker containers

@@ -68,6 +68,7 @@ func (k *K8sClient) ListMonitoredWorkloads(ctx context.Context) ([]*db.Workload,
 					OrchestratorType: "kubernetes",
 					CurrentImage:     container.Image,
 					CurrentDigest:    digest,
+					TrackTag:         resolveTrackTag(dep.Annotations, dep.Spec.Template.Annotations, container.Name),
 					UpdateStatus:     "up_to_date",
 					LastCheckedAt:    &now,
 				})
@@ -93,6 +94,7 @@ func (k *K8sClient) ListMonitoredWorkloads(ctx context.Context) ([]*db.Workload,
 					OrchestratorType: "kubernetes",
 					CurrentImage:     container.Image,
 					CurrentDigest:    digest,
+					TrackTag:         resolveTrackTag(sts.Annotations, sts.Spec.Template.Annotations, container.Name),
 					UpdateStatus:     "up_to_date",
 					LastCheckedAt:    &now,
 				})
@@ -118,6 +120,7 @@ func (k *K8sClient) ListMonitoredWorkloads(ctx context.Context) ([]*db.Workload,
 					OrchestratorType: "kubernetes",
 					CurrentImage:     container.Image,
 					CurrentDigest:    digest,
+					TrackTag:         resolveTrackTag(ds.Annotations, ds.Spec.Template.Annotations, container.Name),
 					UpdateStatus:     "up_to_date",
 					LastCheckedAt:    &now,
 				})
@@ -128,6 +131,23 @@ func (k *K8sClient) ListMonitoredWorkloads(ctx context.Context) ([]*db.Workload,
 	}
 
 	return workloads, nil
+}
+
+// resolveTrackTag extracts an explicit channel tag override for a container,
+// checking per-container annotations before workload-level ones across metadata and pod template.
+func resolveTrackTag(workloadAnns, podAnns map[string]string, containerName string) *string {
+	keys := []string{
+		"container-updater." + containerName + ".track-tag",
+		"container-updater.track-tag",
+	}
+	for _, key := range keys {
+		for _, source := range []map[string]string{workloadAnns, podAnns} {
+			if val := strings.TrimSpace(source[key]); val != "" {
+				return &val
+			}
+		}
+	}
+	return nil
 }
 
 func formatWorkloadName(workloadName, containerName string) string {

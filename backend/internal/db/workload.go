@@ -15,6 +15,7 @@ type Workload struct {
 	CurrentDigest    string     `json:"current_digest"`
 	NewImage         *string    `json:"new_image,omitempty"`
 	NewDigest        *string    `json:"new_digest,omitempty"`
+	TrackTag         *string    `json:"track_tag,omitempty"`
 	UpdateStatus     string     `json:"update_status"` // 'up_to_date', 'update_available', 'updating', 'failed'
 	LastCheckedAt    *time.Time `json:"last_checked_at,omitempty"`
 	LastUpdatedAt    *time.Time `json:"last_updated_at,omitempty"`
@@ -24,8 +25,8 @@ func SaveWorkload(w *Workload) error {
 	query := `
 		INSERT INTO workloads (
 			id, name, namespace_project, orchestrator_type, current_image, current_digest,
-			new_image, new_digest, update_status, last_checked_at, last_updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			new_image, new_digest, track_tag, update_status, last_checked_at, last_updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			name=excluded.name,
 			namespace_project=excluded.namespace_project,
@@ -34,6 +35,7 @@ func SaveWorkload(w *Workload) error {
 			current_digest=excluded.current_digest,
 			new_image=excluded.new_image,
 			new_digest=excluded.new_digest,
+			track_tag=excluded.track_tag,
 			update_status=excluded.update_status,
 			last_checked_at=excluded.last_checked_at,
 			last_updated_at=excluded.last_updated_at;
@@ -41,29 +43,26 @@ func SaveWorkload(w *Workload) error {
 	_, err := DB.Exec(
 		query,
 		w.ID, w.Name, w.NamespaceProject, w.OrchestratorType, w.CurrentImage, w.CurrentDigest,
-		w.NewImage, w.NewDigest, w.UpdateStatus, w.LastCheckedAt, w.LastUpdatedAt,
+		w.NewImage, w.NewDigest, w.TrackTag, w.UpdateStatus, w.LastCheckedAt, w.LastUpdatedAt,
 	)
 	return err
 }
 
-func GetWorkload(id string) (*Workload, error) {
-	query := `
-		SELECT id, name, namespace_project, orchestrator_type, current_image, current_digest,
-		       new_image, new_digest, update_status, last_checked_at, last_updated_at
-		FROM workloads WHERE id = ?
-	`
-	row := DB.QueryRow(query, id)
+const workloadSelectCols = `id, name, namespace_project, orchestrator_type, current_image, current_digest,
+		       new_image, new_digest, track_tag, update_status, last_checked_at, last_updated_at`
 
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanWorkload(scanner rowScanner) (*Workload, error) {
 	w := &Workload{}
 	var lastCheckedVal, lastUpdatedVal interface{}
-	err := row.Scan(
+	err := scanner.Scan(
 		&w.ID, &w.Name, &w.NamespaceProject, &w.OrchestratorType, &w.CurrentImage, &w.CurrentDigest,
-		&w.NewImage, &w.NewDigest, &w.UpdateStatus, &lastCheckedVal, &lastUpdatedVal,
+		&w.NewImage, &w.NewDigest, &w.TrackTag, &w.UpdateStatus, &lastCheckedVal, &lastUpdatedVal,
 	)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
 		return nil, err
 	}
 
@@ -73,16 +72,23 @@ func GetWorkload(id string) (*Workload, error) {
 	if t, err := ParseTime(lastUpdatedVal); err == nil && !t.IsZero() {
 		w.LastUpdatedAt = &t
 	}
+	return w, nil
+}
 
+func GetWorkload(id string) (*Workload, error) {
+	query := `SELECT ` + workloadSelectCols + ` FROM workloads WHERE id = ?`
+	w, err := scanWorkload(DB.QueryRow(query, id))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
 	return w, nil
 }
 
 func ListWorkloads() ([]*Workload, error) {
-	query := `
-		SELECT id, name, namespace_project, orchestrator_type, current_image, current_digest,
-		       new_image, new_digest, update_status, last_checked_at, last_updated_at
-		FROM workloads
-	`
+	query := `SELECT ` + workloadSelectCols + ` FROM workloads`
 	rows, err := DB.Query(query)
 	if err != nil {
 		return nil, err
@@ -91,20 +97,9 @@ func ListWorkloads() ([]*Workload, error) {
 
 	var list []*Workload
 	for rows.Next() {
-		w := &Workload{}
-		var lastCheckedVal, lastUpdatedVal interface{}
-		err := rows.Scan(
-			&w.ID, &w.Name, &w.NamespaceProject, &w.OrchestratorType, &w.CurrentImage, &w.CurrentDigest,
-			&w.NewImage, &w.NewDigest, &w.UpdateStatus, &lastCheckedVal, &lastUpdatedVal,
-		)
+		w, err := scanWorkload(rows)
 		if err != nil {
 			return nil, err
-		}
-		if t, err := ParseTime(lastCheckedVal); err == nil && !t.IsZero() {
-			w.LastCheckedAt = &t
-		}
-		if t, err := ParseTime(lastUpdatedVal); err == nil && !t.IsZero() {
-			w.LastUpdatedAt = &t
 		}
 		list = append(list, w)
 	}
