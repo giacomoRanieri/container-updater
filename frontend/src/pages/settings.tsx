@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import {
@@ -15,7 +15,7 @@ export default function Settings() {
   const [notifications, setNotifications] = useState<NotificationService[]>([]);
   const [registries, setRegistries] = useState<RegistryCredential[]>([]);
   const [activeTab, setActiveTab] = useState<"notifications" | "registries" | "system">("notifications");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isRegistrySaving, setIsRegistrySaving] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -31,8 +31,13 @@ export default function Settings() {
   const [registryUsername, setRegistryUsername] = useState("");
   const [registryPassword, setRegistryPassword] = useState("");
 
+  const showMsg = useCallback((text: string, type: "success" | "error") => {
+    setMessage({ text, type });
+    setTimeout(() => setMessage(null), 5000);
+  }, []);
+
   // Load notification settings
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     setIsLoading(true);
     try {
       const list = await fetchNotifications();
@@ -43,13 +48,27 @@ export default function Settings() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [showMsg]);
 
   useEffect(() => {
-    loadSettings();
-  }, []);
+    let active = true;
+    fetchNotifications()
+      .then((list) => {
+        if (active) setNotifications(list);
+      })
+      .catch((err) => {
+        console.error("Failed to load notification settings", err);
+        if (active) showMsg("Failed to retrieve notification configurations", "error");
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [showMsg]);
 
-  const loadRegistries = async () => {
+  const loadRegistries = useCallback(async () => {
     try {
       const list = await fetchRegistries();
       setRegistries(list);
@@ -57,18 +76,23 @@ export default function Settings() {
       console.error("Failed to load registry credentials", err);
       showMsg("Failed to retrieve registry credentials", "error");
     }
-  };
+  }, [showMsg]);
 
   useEffect(() => {
-    if (activeTab === "registries") {
-      loadRegistries();
-    }
-  }, [activeTab]);
-
-  const showMsg = (text: string, type: "success" | "error") => {
-    setMessage({ text, type });
-    setTimeout(() => setMessage(null), 5000);
-  };
+    if (activeTab !== "registries") return;
+    let active = true;
+    fetchRegistries()
+      .then((list) => {
+        if (active) setRegistries(list);
+      })
+      .catch((err) => {
+        console.error("Failed to load registry credentials", err);
+        if (active) showMsg("Failed to retrieve registry credentials", "error");
+      });
+    return () => {
+      active = false;
+    };
+  }, [activeTab, showMsg]);
 
   // Handle Form Submission
   const handleSave = async (e: React.FormEvent) => {

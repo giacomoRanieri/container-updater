@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Head from "next/head";
+import Link from "next/link";
 import { fetchSession, redirectToLogin, User } from "../services/auth";
 import {
   fetchWorkloads,
@@ -69,10 +70,22 @@ export default function Home() {
 
   // Load data once authenticated
   useEffect(() => {
-    if (isAuthenticated) {
-      refreshAllData();
-    }
-  }, [isAuthenticated, refreshAllData]);
+    if (!isAuthenticated) return;
+    let active = true;
+    Promise.all([fetchWorkloads(), fetchAuditLogs(), fetchStats()])
+      .then(([wList, aLogs, appStats]) => {
+        if (!active) return;
+        setWorkloads(wList);
+        setAuditLogs(aLogs);
+        setStats(appStats);
+      })
+      .catch((err) => {
+        console.error("Failed to load dashboard data:", err);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated]);
 
   const [jobProgress, setJobProgress] = useState<Record<string, { percent?: number; message?: string; podStatus?: string }>>({});
 
@@ -82,17 +95,22 @@ export default function Home() {
 
     const cleanup = connectWebSocket((event, data) => {
       if (event === "workload_updated") {
-        // Update specific workload status dynamically in the list
-        setWorkloads((prev) =>
-          prev.map((w) => (w.id === data.id ? { ...w, update_status: data.update_status } : w))
-        );
+        const targetId = data.id;
+        const nextStatus = data.update_status;
+        if (targetId && nextStatus) {
+          // Update specific workload status dynamically in the list
+          setWorkloads((prev) =>
+            prev.map((w) => (w.id === targetId ? { ...w, update_status: nextStatus } : w))
+          );
+        }
         // Refresh stats
         fetchStats().then(setStats).catch(console.error);
       } else if (event === "job_status") {
-        if (data.workload_id) {
+        const workloadId = data.workload_id;
+        if (workloadId) {
           setJobProgress((prev) => ({
             ...prev,
-            [data.workload_id]: {
+            [workloadId]: {
               percent: data.percent_complete,
               message: data.message,
             },
@@ -100,23 +118,24 @@ export default function Home() {
         }
         // If a job completes or fails, refresh audit logs and workloads
         if (data.status === "completed" || data.status === "failed" || data.status === "rolled_back") {
-          if (data.workload_id) {
+          if (workloadId) {
             setJobProgress((prev) => {
               const copy = { ...prev };
-              delete copy[data.workload_id];
+              delete copy[workloadId];
               return copy;
             });
           }
           refreshAllData();
         }
       } else if (event === "pod_event") {
-        if (data.workload_id) {
+        const workloadId = data.workload_id;
+        if (workloadId) {
           setJobProgress((prev) => ({
             ...prev,
-            [data.workload_id]: {
-              ...prev[data.workload_id],
+            [workloadId]: {
+              ...prev[workloadId],
               podStatus: data.status,
-              message: data.message || prev[data.workload_id]?.message,
+              message: data.message || prev[workloadId]?.message,
             },
           }));
         }
@@ -246,9 +265,9 @@ export default function Home() {
             >
               Audit Log
             </span>
-            <a href="/settings" className="nav-link">
+            <Link href="/settings" className="nav-link">
               Settings
-            </a>
+            </Link>
             
             {currentUser && (
               <div className="user-badge">

@@ -15,14 +15,28 @@ We follow a modified Git Flow architecture to guarantee stability and release qu
   * **Direct pushes are strictly prohibited**.
   * Pull Requests must target `develop`.
   * Merging to `develop` automatically builds and publishes **Beta multi-arch Docker images** (`:beta`, `:beta-<sha>`) on GHCR.
-* **`feature/*` / `fix/*`**: Working branches created by contributors.
+* **`feat/*` / `fix/*` / `docs/*` / `chore/*` / `ci/*` / `refactor/*`** (or legacy `feature/*`): Working branches created by contributors from `develop` and merged back via Pull Requests targeting `develop`.
+
+### 1.1 Spec-Driven Development (Spec Kit) & Branch Alignment
+
+* **New features & architectural changes**: Follow [our Project Constitution](.specify/memory/constitution.md) and the Spec Kit SDD lifecycle (`/speckit-specify` → `/speckit-clarify` → `/speckit-plan` → `/speckit-tasks` → `/speckit-analyze` → `/speckit-implement` → `/speckit-converge`), storing artifacts under `specs/<NNN>-<short-name>/` (tracked by `.specify/feature.json`).
+* **Decoupled Spec Directories and Git Branches**: Spec directory names (`specs/002-<short-name>/`) and Git branches (`feat/<short-name>`) are intentionally decoupled so SDD specs integrate cleanly with Git Flow. Always create the Git branch off `develop`—either via:
+  ```bash
+  .specify/scripts/bash/create-new-feature.sh --create-branch --short-name "<short-name>" "<description>"
+  ```
+  or manually with `git checkout -b feat/<short-name> develop`—and open Pull Requests targeting `develop`.
+* **Targeted bugfixes**: May follow a lightweight regression-first cycle (`fix/<name>` branched from `develop` with a reproducing test) without creating a new `specs/` directory, updating existing specs only if functional requirements change.
 
 ---
 
 ## 2. Code Review & Maintainer Approvals
 
 * All Pull Requests targeting `master` or `develop` require:
-  1. **Passing CI Status Checks** (Commitlint, Go tests, Next.js build, and multi-arch Docker checks).
+  1. **Passing CI Status Checks**:
+     * `Validate Conventional Commits` ([.github/workflows/commitlint.yml](.github/workflows/commitlint.yml))
+     * `Backend Go Test & Vet` — `go vet`, `go test -race`, and static `CGO_ENABLED=0` build ([.github/workflows/ci-tests.yml](.github/workflows/ci-tests.yml))
+     * `Frontend Lint, Typecheck & Build` — `pnpm lint`, `tsc --noEmit`, and `pnpm build` ([.github/workflows/ci-tests.yml](.github/workflows/ci-tests.yml))
+     * `Multi-Arch Build and GHCR Publish` ([.github/workflows/ci-cd.yml](.github/workflows/ci-cd.yml))
   2. **At least 1 approval** from a Maintainer designated in [.github/CODEOWNERS](.github/CODEOWNERS).
 
 ---

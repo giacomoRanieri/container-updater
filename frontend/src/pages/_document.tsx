@@ -1,14 +1,14 @@
 import { Html, Head, Main, NextScript } from "next/document";
+import Script from "next/script";
 
 export default function Document() {
   return (
     <Html lang="en">
-      <Head>
-        <script src="/env-config.js" />
-      </Head>
+      <Head />
       <body>
         <Main />
         <NextScript />
+        <Script src="/env-config.js" strategy="beforeInteractive" />
       </body>
     </Html>
   );

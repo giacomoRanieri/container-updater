@@ -47,6 +47,16 @@ export interface RegistryCredential {
   created_at?: string;
 }
 
+export interface WebSocketEventData {
+  id?: string;
+  update_status?: Workload["update_status"];
+  workload_id?: string;
+  percent_complete?: number;
+  message?: string;
+  status?: string;
+  [key: string]: unknown;
+}
+
 // Fetch helper with standard headers and credentials
 async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const backendUrl = getBackendUrl();
@@ -132,7 +142,7 @@ export async function triggerManualScan(): Promise<{ status: string; message: st
 
 // WebSocket real-time subscription
 export function connectWebSocket(
-  onEvent: (event: string, data: any) => void,
+  onEvent: (event: string, data: WebSocketEventData) => void,
   onClose?: () => void
 ): () => void {
   let ws: WebSocket | null = null;

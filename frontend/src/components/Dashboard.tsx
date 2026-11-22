@@ -21,9 +21,6 @@ export default function Dashboard({
   const [orchestratorFilter, setOrchestratorFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  // Extract unique projects/namespaces for filtering
-  const projects = Array.from(new Set(workloads.map((w) => w.namespace_project)));
-
   // Filter logic
   const filteredWorkloads = workloads.filter((w) => {
     const matchesSearch =
@@ -129,7 +126,7 @@ export default function Dashboard({
           </svg>
           <h3 style={{ color: "var(--text-secondary)", marginBottom: "0.5rem" }}>No Monitored Workloads Found</h3>
           <p style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>
-            Make sure to add the label `container-updater.enable=true` to your containers (Docker Compose) or annotation `container-updater.enable: "true"` (Kubernetes).
+            Make sure to add the label `container-updater.enable=true` to your containers (Docker Compose) or annotation `container-updater.enable: &quot;true&quot;` (Kubernetes).
           </p>
         </div>
       ) : (
